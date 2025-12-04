@@ -10,7 +10,7 @@
     "build:server": "tsc --project tsconfig.server.json",
     "dev": "concurrently \"npm:dev:server\" \"npm:dev:client\"",
     "build": "npm run build:client && npm run build:server",
-    "start": "node dist-server/index.js",
+    "start": "ts-node server/index.ts",
     "setup": "npm install && echo '\n✅ Dependências instaladas!\n\n📝 Próximos passos:\n1. Configure o arquivo .env com suas credenciais MySQL\n2. Execute: npm run dev\n3. Acesse: http://localhost:5173\n'"
   },
   "dependencies": {
