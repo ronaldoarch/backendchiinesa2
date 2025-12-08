@@ -18,11 +18,11 @@ app.use(
 app.use(json());
 app.use(requestLogger);
 
-const uploadsDir = path.resolve(__dirname, "uploads");
+const uploadsDir = path.resolve(__dirname, "..", "..", "server", "uploads");
 app.use("/uploads", express.static(uploadsDir));
 
 // Servir arquivos estáticos do frontend (public_html)
-const frontendDir = path.resolve(__dirname, "..", "public_html");
+const frontendDir = path.resolve(__dirname, "..", "..", "public_html");
 app.use(express.static(frontendDir));
 
 app.use("/api", apiRouter);

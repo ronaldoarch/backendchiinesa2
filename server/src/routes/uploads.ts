@@ -6,7 +6,7 @@ import { uploadFileController } from "../controllers/uploadsController";
 
 export const uploadsRouter = Router();
 
-const uploadDir = path.resolve(__dirname, "..", "uploads");
+const uploadDir = path.resolve(__dirname, "..", "..", "server", "uploads");
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
