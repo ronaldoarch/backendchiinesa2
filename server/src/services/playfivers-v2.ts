@@ -394,44 +394,29 @@ export const playFiversService = {
       const client = await createClient();
 
       // Segundo a documentação: GET /api/v2/agent para testar conexão
-      // Requer agentToken e secretKey no body (mesmo para GET, pode precisar no body)
+      // A API só aceita GET, HEAD, PUT (não aceita POST)
+      // Requer agentToken e secretKey no body (mesmo para GET)
       try {
         const authBody = await addAuthToBody({});
-        // Tentar POST primeiro (algumas APIs requerem body mesmo para "get info")
-        let response;
-        try {
-          // Garantir que a URL não tenha /api duplicado
-          const endpoint = "/api/v2/agent";
-          // eslint-disable-next-line no-console
-          console.log(`[PlayFivers] Tentando conectar em: ${PLAYFIVERS_BASE_URL}${endpoint}`, {
-            method: "POST",
-            body: authBody,
-            hasBody: Object.keys(authBody).length > 0
-          });
-          response = await client.post(endpoint, authBody);
-        } catch (postError: any) {
-          // Se POST falhar com 405, tentar GET (mas ainda enviar body)
-          if (postError.response?.status === 405 || postError.response?.status === 422) {
-            const endpoint = "/api/v2/agent";
-            // eslint-disable-next-line no-console
-            console.log(`[PlayFivers] POST falhou com ${postError.response?.status}, tentando GET com body: ${PLAYFIVERS_BASE_URL}${endpoint}`, {
-              body: authBody,
-              hasBody: Object.keys(authBody).length > 0
-            });
-            // Para GET com body, usar método POST mas com método GET customizado
-            // Ou usar a opção data do axios que funciona para alguns servidores
-            response = await client.request({
-              method: "GET",
-              url: endpoint,
-              data: authBody, // Enviar body mesmo em GET
-              headers: {
-                "Content-Type": "application/json"
-              }
-            });
-          } else {
-            throw postError;
+        const endpoint = "/api/v2/agent";
+        
+        // A API PlayFivers só aceita GET para este endpoint
+        // eslint-disable-next-line no-console
+        console.log(`[PlayFivers] Tentando conectar em: ${PLAYFIVERS_BASE_URL}${endpoint}`, {
+          method: "GET",
+          body: authBody,
+          hasBody: Object.keys(authBody).length > 0
+        });
+        
+        // Usar GET com body (alguns servidores aceitam body em GET)
+        const response = await client.request({
+          method: "GET",
+          url: endpoint,
+          data: authBody, // Enviar body mesmo em GET
+          headers: {
+            "Content-Type": "application/json"
           }
-        }
+        });
         
         const { data, status } = response;
         
@@ -441,12 +426,29 @@ export const playFiversService = {
           message: `Conexão OK! Informações do agente obtidas (status: ${status})`
         };
       } catch (error: any) {
-        // Se for 401/403, credenciais podem estar erradas
-        if (error.response?.status === 401 || error.response?.status === 403) {
+        // Se for 401, credenciais podem estar erradas
+        if (error.response?.status === 401) {
           return {
             success: false,
-            error: "Credenciais inválidas ou sem permissão",
-            message: `Erro de autenticação (status: ${error.response.status}). Verifique agentToken e secretKey.`
+            error: "Credenciais inválidas",
+            message: `Erro de autenticação (401). Verifique se agentToken e secretKey estão corretos.`
+          };
+        }
+        
+        // Se for 403, pode ser IP não autorizado ou credenciais sem permissão
+        if (error.response?.status === 403) {
+          const errorMsg = error.response?.data?.msg || error.response?.data?.message || "";
+          if (errorMsg.includes("IP") || errorMsg.includes("ip") || errorMsg.includes("permitido")) {
+            return {
+              success: false,
+              error: "IP não autorizado",
+              message: `A API PlayFivers rejeitou a requisição: ${errorMsg}. Você precisa adicionar o IP do servidor na whitelist da PlayFivers. Entre em contato com o suporte da PlayFivers para autorizar o IP do seu servidor.`
+            };
+          }
+          return {
+            success: false,
+            error: "Acesso negado",
+            message: `Erro de autorização (403): ${errorMsg || "Verifique se as credenciais têm permissão para acessar este recurso."}`
           };
         }
         
