@@ -176,20 +176,41 @@ async function addAuthToBody(body: Record<string, unknown>): Promise<Record<stri
     
     // Segundo a documentação: agentToken e secretKey (ou agent_code e agent_secret)
     if (creds.agentToken && creds.agentSecret) {
-      return {
+      const authBody = {
         ...body,
         agentToken: creds.agentToken,
-        secretKey: creds.agentSecret,
-        // Também tentar formato alternativo
-        agent_token: creds.agentToken,
-        secret_key: creds.agentSecret
+        secretKey: creds.agentSecret
       };
+      // eslint-disable-next-line no-console
+      console.log("[PlayFivers] Adicionando autenticação ao body (agentToken + secretKey):", {
+        hasAgentToken: !!creds.agentToken,
+        hasSecretKey: !!creds.agentSecret,
+        authMethod: creds.authMethod,
+        bodyKeys: Object.keys(authBody)
+      });
+      return authBody;
     } else if (creds.agentId && creds.agentSecret) {
-      return {
+      const authBody = {
         ...body,
         agent_code: creds.agentId,
         agent_secret: creds.agentSecret
       };
+      // eslint-disable-next-line no-console
+      console.log("[PlayFivers] Adicionando autenticação ao body (agent_code + agent_secret):", {
+        hasAgentId: !!creds.agentId,
+        hasSecretKey: !!creds.agentSecret,
+        authMethod: creds.authMethod,
+        bodyKeys: Object.keys(authBody)
+      });
+      return authBody;
+    } else {
+      // eslint-disable-next-line no-console
+      console.warn("[PlayFivers] ⚠️ Credenciais incompletas para autenticação no body:", {
+        hasAgentToken: !!creds.agentToken,
+        hasAgentId: !!creds.agentId,
+        hasSecretKey: !!creds.agentSecret,
+        authMethod: creds.authMethod
+      });
     }
   }
   
@@ -417,6 +438,17 @@ export const playFiversService = {
           };
         }
         
+        // Se for 422, dados inválidos ou formato incorreto
+        if (error.response?.status === 422) {
+          const errorData = error.response?.data || {};
+          const errorMsg = errorData.message || errorData.error || "Dados inválidos";
+          return {
+            success: false,
+            error: `Erro de validação (422): ${errorMsg}`,
+            message: `A API PlayFivers rejeitou a requisição. Verifique se as credenciais estão corretas e no formato esperado. Detalhes: ${JSON.stringify(errorData)}`
+          };
+        }
+        
         throw error;
       }
     } catch (error: any) {
@@ -520,11 +552,22 @@ export const playFiversService = {
       };
     } catch (error: any) {
       // eslint-disable-next-line no-console
-      console.error("❌ Erro ao buscar provedores:", error.message);
+      console.error("❌ Erro ao buscar provedores:", error);
+
+      // Tratamento específico para 422
+      if (error.response?.status === 422) {
+        const errorData = error.response?.data || {};
+        const errorMsg = errorData.message || errorData.error || "Dados inválidos";
+        return {
+          success: false,
+          error: `Erro de validação (422): ${errorMsg}`,
+          message: `A API PlayFivers rejeitou a requisição. Verifique se as credenciais estão corretas e no formato esperado. Detalhes: ${JSON.stringify(errorData)}`
+        };
+      }
 
       return {
         success: false,
-        error: error.response?.data?.message || error.message,
+        error: error.response?.data?.message || error.response?.data?.error || error.message,
         message: "Erro ao buscar provedores"
       };
     }
@@ -588,11 +631,22 @@ export const playFiversService = {
 
     } catch (error: any) {
       // eslint-disable-next-line no-console
-      console.error("❌ Erro ao configurar callback URL:", error.message);
+      console.error("❌ Erro ao configurar callback URL:", error);
+
+      // Tratamento específico para 422
+      if (error.response?.status === 422) {
+        const errorData = error.response?.data || {};
+        const errorMsg = errorData.message || errorData.error || "Dados inválidos";
+        return {
+          success: false,
+          error: `Erro de validação (422): ${errorMsg}`,
+          message: `A API PlayFivers rejeitou a requisição. Verifique se as credenciais e a URL de callback estão corretas. Detalhes: ${JSON.stringify(errorData)}`
+        };
+      }
 
       return {
         success: false,
-        error: error.response?.data?.message || error.message,
+        error: error.response?.data?.message || error.response?.data?.error || error.message,
         message: "Erro ao configurar callback URL"
       };
     }
@@ -679,11 +733,22 @@ export const playFiversService = {
       };
     } catch (error: any) {
       // eslint-disable-next-line no-console
-      console.error("❌ Erro ao buscar jogos:", error.message);
+      console.error("❌ Erro ao buscar jogos:", error);
+
+      // Tratamento específico para 422
+      if (error.response?.status === 422) {
+        const errorData = error.response?.data || {};
+        const errorMsg = errorData.message || errorData.error || "Dados inválidos";
+        return {
+          success: false,
+          error: `Erro de validação (422): ${errorMsg}`,
+          message: `A API PlayFivers rejeitou a requisição. Verifique se as credenciais estão corretas e no formato esperado. Detalhes: ${JSON.stringify(errorData)}`
+        };
+      }
 
       return {
         success: false,
-        error: error.response?.data?.message || error.message,
+        error: error.response?.data?.message || error.response?.data?.error || error.message,
         message: "Erro ao buscar jogos"
       };
     }
