@@ -119,3 +119,5 @@ E use a **SOLUÇÃO 2 - Opção A** (URL direta no frontend).
 
 Após aplicar a solução, o frontend deve conseguir acessar o backend corretamente! 🚀
 
+
+

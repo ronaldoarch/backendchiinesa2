@@ -7,6 +7,7 @@ type Env = {
   dbUser: string;
   dbPassword: string;
   dbName: string;
+  jwtSecret: string;
 };
 
 export const env: Env = {
@@ -15,7 +16,8 @@ export const env: Env = {
   dbPort: Number(process.env.DB_PORT || 3306),
   dbUser: process.env.DB_USER || "root",
   dbPassword: process.env.DB_PASSWORD || "",
-  dbName: process.env.DB_NAME || "chinesa_cassino"
+  dbName: process.env.DB_NAME || "chinesa_cassino",
+  jwtSecret: process.env.JWT_SECRET || "sua-chave-secreta-super-segura-mude-em-producao"
 };
 
 if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_NAME) {
@@ -24,4 +26,6 @@ if (!process.env.DB_HOST || !process.env.DB_USER || !process.env.DB_NAME) {
     "Variáveis de banco de dados não configuradas. Defina DB_HOST, DB_USER, DB_PASSWORD e DB_NAME no .env."
   );
 }
+
+
 

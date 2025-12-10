@@ -54,6 +54,21 @@ export async function initDb() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        phone VARCHAR(20),
+        currency VARCHAR(10) DEFAULT 'BRL',
+        is_admin BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_username (username),
+        INDEX idx_is_admin (is_admin)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
     // eslint-disable-next-line no-console
     console.log("✅ Banco de dados MySQL conectado e tabelas criadas com sucesso!");
   } catch (error) {
@@ -64,4 +79,6 @@ export async function initDb() {
     connection.release();
   }
 }
+
+
 

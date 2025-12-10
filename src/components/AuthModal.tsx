@@ -1,12 +1,14 @@
 import { useState } from "react";
+import { api, setAuthToken, setUser } from "../services/api";
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSuccess: (user: { username: string }) => void;
+  onSuccess: (user: { username: string; id: number; is_admin: boolean }) => void;
 };
 
 export function AuthModal({ open, onClose, onSuccess }: Props) {
+  const [mode, setMode] = useState<"login" | "register">("register");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -14,6 +16,7 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
   const [currency, setCurrency] = useState("BRL");
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   if (!open) return null;
 
@@ -26,16 +29,89 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
     return score;
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
-    if (!accepted) return;
+    if (!accepted) {
+      setError("Você precisa aceitar os termos para continuar");
+      return;
+    }
     if (password !== confirmPassword) {
       setError("As senhas não conferem");
       return;
     }
+    if (password.length < 6) {
+      setError("A senha deve ter pelo menos 6 caracteres");
+      return;
+    }
+    if (username.length < 3) {
+      setError("O nome de usuário deve ter pelo menos 3 caracteres");
+      return;
+    }
+
     setError("");
-    onSuccess({ username });
-    onClose();
+    setLoading(true);
+
+    try {
+      const response = await api.post("/auth/register", {
+        username,
+        password,
+        phone: phone || undefined,
+        currency
+      });
+
+      setAuthToken(response.data.token);
+      setUser(response.data.user);
+      onSuccess(response.data.user);
+      onClose();
+      // Limpar formulário
+      setUsername("");
+      setPassword("");
+      setConfirmPassword("");
+      setPhone("");
+      setAccepted(false);
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Erro ao criar conta. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!username || !password) {
+      setError("Preencha todos os campos");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+
+    try {
+      const response = await api.post("/auth/login", {
+        username,
+        password
+      });
+
+      setAuthToken(response.data.token);
+      setUser(response.data.user);
+      onSuccess(response.data.user);
+      onClose();
+      // Limpar formulário
+      setUsername("");
+      setPassword("");
+    } catch (err: any) {
+      setError(err.response?.data?.error || "Credenciais inválidas. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    if (mode === "login") {
+      handleLogin(e);
+    } else {
+      handleRegister(e);
+    }
   }
 
   return (
@@ -48,10 +124,10 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
       >
         <header className="auth-modal-header modern">
           <div className="auth-title-row">
-            <span className="auth-icon">🧑‍🚀</span>
+            <span className="auth-icon">{mode === "login" ? "🔐" : "🧑‍🚀"}</span>
             <div>
-              <p className="auth-subtitle">Cadastro rápido</p>
-          <h2>Registre sua conta</h2>
+              <p className="auth-subtitle">{mode === "login" ? "Acesso rápido" : "Cadastro rápido"}</p>
+              <h2>{mode === "login" ? "Faça login" : "Registre sua conta"}</h2>
             </div>
           </div>
         </header>
@@ -73,88 +149,92 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Crie uma senha forte"
+              placeholder={mode === "login" ? "Digite sua senha" : "Crie uma senha forte"}
               required
             />
           </label>
 
-          <div className="password-strength">
-            <span>Força</span>
-            <div className="strength-bars">
-              {[0, 1, 2, 3].map((i) => (
-                <span
-                  key={i}
-                  className={`strength-bar ${
-                    passwordStrength(password) > i ? "filled" : ""
-                  }`}
+          {mode === "register" && (
+            <>
+              <div className="password-strength">
+                <span>Força</span>
+                <div className="strength-bars">
+                  {[0, 1, 2, 3].map((i) => (
+                    <span
+                      key={i}
+                      className={`strength-bar ${
+                        passwordStrength(password) > i ? "filled" : ""
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <label>
+                <span>* Confirme a senha</span>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repita a senha"
+                  required
                 />
-              ))}
-            </div>
-          </div>
+              </label>
 
-          <label>
-            <span>* Confirme a senha</span>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Repita a senha"
-              required
-            />
-          </label>
+              <label>
+                <span>* Telefone</span>
+                <div className="input-group">
+                  <span className="input-prefix">+55</span>
+                  <input
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="Digite o número do celular"
+                    required
+                  />
+                </div>
+              </label>
 
-          <label>
-            <span>* Telefone</span>
-            <div className="input-group">
-              <span className="input-prefix">+55</span>
-            <input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="Digite o número do celular"
-                required
-            />
-            </div>
-          </label>
+              <label>
+                <span>* Moeda</span>
+                <div className="select-flag">
+                  <span className="flag">🇧🇷</span>
+                  <select
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value)}
+                  >
+                    <option value="BRL">BRL (BRL)</option>
+                  </select>
+                </div>
+              </label>
 
-          <label>
-            <span>* Moeda</span>
-            <div className="select-flag">
-              <span className="flag">🇧🇷</span>
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-            >
-              <option value="BRL">BRL (BRL)</option>
-            </select>
-            </div>
-          </label>
-
-          <label className="auth-modal-checkline modern-check">
-            <input
-              type="checkbox"
-              checked={accepted}
-              onChange={(e) => setAccepted(e.target.checked)}
-            />
-            <span>
-              Tenho 18 anos, li e concordo com{" "}
-              <button
-                type="button"
-                className="link-inline"
-                onClick={(ev) => ev.preventDefault()}
-              >
-                Acordo do Usuário
-              </button>
-            </span>
-          </label>
+              <label className="auth-modal-checkline modern-check">
+                <input
+                  type="checkbox"
+                  checked={accepted}
+                  onChange={(e) => setAccepted(e.target.checked)}
+                />
+                <span>
+                  Tenho 18 anos, li e concordo com{" "}
+                  <button
+                    type="button"
+                    className="link-inline"
+                    onClick={(ev) => ev.preventDefault()}
+                  >
+                    Acordo do Usuário
+                  </button>
+                </span>
+              </label>
+            </>
+          )}
 
           {error && <div className="auth-error">{error}</div>}
 
           <button
             type="submit"
             className="btn auth-modern-submit"
-            disabled={!accepted}
+            disabled={loading || (mode === "register" && !accepted)}
           >
-            Registro
+            {loading ? "Carregando..." : mode === "login" ? "Entrar" : "Registrar"}
           </button>
         </form>
 
@@ -169,9 +249,14 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
           <button
             type="button"
             className="auth-footer-link"
-            onClick={onClose}
+            onClick={() => {
+              setMode(mode === "login" ? "register" : "login");
+              setError("");
+              setPassword("");
+              setConfirmPassword("");
+            }}
           >
-            Login
+            {mode === "login" ? "Criar conta" : "Já tenho conta"}
           </button>
         </footer>
       </div>

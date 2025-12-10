@@ -70,3 +70,5 @@ export async function deleteBanner(id: number): Promise<boolean> {
   return (result as any).affectedRows > 0;
 }
 
+
+

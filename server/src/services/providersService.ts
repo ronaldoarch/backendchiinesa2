@@ -77,3 +77,5 @@ export async function deleteProvider(id: number): Promise<boolean> {
   return (result as any).affectedRows > 0;
 }
 
+
+

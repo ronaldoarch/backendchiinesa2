@@ -2,23 +2,29 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { getSettings, upsertSetting } from "../services/settingsService";
 
-const settingSchema = z.object({
-  key: z.string(),
-  value: z.string()
-});
+const settingsObjectSchema = z.record(z.string(), z.string());
 
 export async function listSettingsController(_req: Request, res: Response) {
   const settings = await getSettings();
-  res.json(settings);
+  // Converter array para objeto Record<string, string>
+  const settingsObject: Record<string, string> = {};
+  for (const setting of settings) {
+    settingsObject[setting.key] = setting.value;
+  }
+  res.json(settingsObject);
 }
 
 export async function upsertSettingsController(req: Request, res: Response) {
-  const parsed = z.array(settingSchema).safeParse(req.body);
+  const parsed = settingsObjectSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json(parsed.error.flatten());
   }
 
-  await Promise.all(parsed.data.map((item) => upsertSetting(item.key, item.value)));
+  await Promise.all(
+    Object.entries(parsed.data).map(([key, value]) => upsertSetting(key, value))
+  );
   res.json({ ok: true });
 }
+
+
 

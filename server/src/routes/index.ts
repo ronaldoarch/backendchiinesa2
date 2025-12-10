@@ -5,6 +5,8 @@ import { bannersRouter } from "./banners";
 import { settingsRouter } from "./settings";
 import { uploadsRouter } from "./uploads";
 import { playfiversRouter } from "./playfivers";
+import { authRouter } from "./auth";
+import { authenticate, requireAdmin } from "../middleware/auth";
 
 export const apiRouter = Router();
 
@@ -18,10 +20,18 @@ apiRouter.post("/playfivers/callback", (req, res) => {
   res.status(200).json({ ok: true });
 });
 
+// Rotas públicas
+apiRouter.use("/auth", authRouter);
+
+// Rotas de leitura públicas, escrita protegida
 apiRouter.use("/providers", providersRouter);
 apiRouter.use("/games", gamesRouter);
 apiRouter.use("/banners", bannersRouter);
-apiRouter.use("/settings", settingsRouter);
-apiRouter.use("/uploads", uploadsRouter);
-apiRouter.use("/playfivers", playfiversRouter);
+
+// Rotas protegidas (requerem autenticação e admin)
+apiRouter.use("/settings", authenticate, requireAdmin, settingsRouter);
+apiRouter.use("/uploads", authenticate, requireAdmin, uploadsRouter);
+apiRouter.use("/playfivers", authenticate, requireAdmin, playfiversRouter);
+
+
 
