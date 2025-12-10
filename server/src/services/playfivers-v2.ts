@@ -442,7 +442,7 @@ export const playFiversService = {
             return {
               success: false,
               error: "IP não autorizado",
-              message: `A API PlayFivers rejeitou a requisição: ${errorMsg}. Você precisa adicionar o IP do servidor na whitelist da PlayFivers. Entre em contato com o suporte da PlayFivers para autorizar o IP do seu servidor.`
+              message: `A API PlayFivers rejeitou a requisição: ${errorMsg}. Você precisa adicionar o IP do servidor na whitelist da PlayFivers. Acesse /api/ip-info para descobrir qual IP adicionar. Entre em contato com o suporte da PlayFivers para autorizar o IP do seu servidor.`
             };
           }
           return {

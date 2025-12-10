@@ -14,6 +14,38 @@ apiRouter.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+// Endpoint temporário para descobrir o IP do servidor
+apiRouter.get("/ip-info", (req, res) => {
+  // Obter IP real considerando proxies (Cloudflare, etc)
+  const forwarded = req.headers["x-forwarded-for"];
+  const realIp = req.headers["x-real-ip"];
+  const cfConnectingIp = req.headers["cf-connecting-ip"]; // Cloudflare
+  
+  const ip = 
+    (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : null) ||
+    (typeof realIp === "string" ? realIp : null) ||
+    (typeof cfConnectingIp === "string" ? cfConnectingIp : null) ||
+    req.socket.remoteAddress ||
+    req.ip ||
+    "unknown";
+
+  res.json({
+    ip: ip,
+    headers: {
+      "x-forwarded-for": req.headers["x-forwarded-for"],
+      "x-real-ip": req.headers["x-real-ip"],
+      "cf-connecting-ip": req.headers["cf-connecting-ip"],
+      "x-forwarded": req.headers["x-forwarded"],
+      "forwarded": req.headers["forwarded"]
+    },
+    socket: {
+      remoteAddress: req.socket.remoteAddress,
+      remoteFamily: req.socket.remoteFamily
+    },
+    message: "Este é o IP que a PlayFivers verá quando você fizer requisições. Adicione este IP na whitelist da PlayFivers."
+  });
+});
+
 apiRouter.post("/playfivers/callback", (req, res) => {
   // eslint-disable-next-line no-console
   console.log("📥 Callback PlayFivers recebido:", {
