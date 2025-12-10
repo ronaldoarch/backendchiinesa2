@@ -124,6 +124,7 @@ apiRouter.use("/banners", bannersRouter);
 apiRouter.use("/promotions", promotionsRouter);
 
 // Rotas protegidas (requerem autenticação e admin)
+// GET de settings pode ser acessado por admin autenticado, PUT requer admin
 apiRouter.use("/settings", authenticate, requireAdmin, settingsRouter);
 apiRouter.use("/uploads", authenticate, requireAdmin, uploadsRouter);
 apiRouter.use("/playfivers", authenticate, requireAdmin, playfiversRouter);

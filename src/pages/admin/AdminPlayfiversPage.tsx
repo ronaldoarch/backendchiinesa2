@@ -62,7 +62,8 @@ export function AdminPlayfiversPage() {
     testConnection: false,
     fetchProviders: false,
     fetchGames: false,
-    importing: false
+    importing: false,
+    loadingData: true
   });
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
@@ -104,23 +105,64 @@ export function AdminPlayfiversPage() {
   }, []);
 
   async function loadData() {
+    setLoading((prev) => ({ ...prev, loadingData: true }));
     try {
-      const [pRes, gRes, sRes] = await Promise.all([
-        api.get<Provider[]>("/providers"),
-        api.get<Game[]>("/games"),
-        api.get<Settings>("/settings")
-      ]);
-      setProviders(pRes.data);
-      setGames(gRes.data);
-      setSettingsForm((prev) => ({
-        ...prev,
-        "playfivers.agentId": sRes.data["playfivers.agentId"] ?? "",
-        "playfivers.secret": sRes.data["playfivers.secret"] ?? "",
-        "playfivers.token": sRes.data["playfivers.token"] ?? "",
-        "playfivers.authMethod": sRes.data["playfivers.authMethod"] ?? "bearer"
-      }));
-    } catch (error) {
-      showMessage("error", "Erro ao carregar dados");
+      // Carregar dados separadamente para não bloquear tudo se uma requisição falhar
+      try {
+        const pRes = await api.get<Provider[]>("/providers");
+        setProviders(pRes.data || []);
+        console.log("✅ Provedores carregados:", pRes.data?.length || 0);
+      } catch (error: any) {
+        console.error("❌ Erro ao carregar provedores:", error.response?.status, error.message);
+        const errorMsg = error.response?.data?.error || error.message || "Erro desconhecido";
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          showMessage("error", `Erro de autenticação ao carregar provedores. Verifique se está logado como admin.`);
+        } else {
+          showMessage("error", `Erro ao carregar provedores: ${errorMsg}`);
+        }
+        setProviders([]);
+      }
+
+      try {
+        const gRes = await api.get<Game[]>("/games");
+        setGames(gRes.data || []);
+        console.log("✅ Jogos carregados:", gRes.data?.length || 0);
+      } catch (error: any) {
+        console.error("❌ Erro ao carregar jogos:", error.response?.status, error.message);
+        const errorMsg = error.response?.data?.error || error.message || "Erro desconhecido";
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          showMessage("error", `Erro de autenticação ao carregar jogos. Verifique se está logado como admin.`);
+        } else {
+          showMessage("error", `Erro ao carregar jogos: ${errorMsg}`);
+        }
+        setGames([]);
+      }
+
+      try {
+        const sRes = await api.get<Settings>("/settings");
+        console.log("✅ Settings carregados:", Object.keys(sRes.data || {}));
+        const settings = sRes.data || {};
+        setSettingsForm((prev) => ({
+          ...prev,
+          "playfivers.agentId": settings["playfivers.agentId"] ?? "",
+          "playfivers.secret": settings["playfivers.secret"] ?? "",
+          "playfivers.token": settings["playfivers.token"] ?? "",
+          "playfivers.authMethod": settings["playfivers.authMethod"] ?? "agent"
+        }));
+      } catch (error: any) {
+        console.error("❌ Erro ao carregar settings:", error.response?.status, error.message);
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          showMessage("error", `Erro de autenticação ao carregar credenciais. Verifique se está logado como admin.`);
+        } else {
+          // Não mostrar erro para settings, apenas usar valores padrão
+          console.warn("⚠️ Usando valores padrão para credenciais PlayFivers");
+        }
+      }
+    } catch (error: any) {
+      console.error("❌ Erro geral ao carregar dados:", error);
+      showMessage("error", `Erro ao carregar dados: ${error.message || "Erro desconhecido"}`);
+    } finally {
+      setLoading((prev) => ({ ...prev, loadingData: false }));
     }
   }
 
@@ -452,6 +494,11 @@ export function AdminPlayfiversPage() {
       {/* Credenciais */}
       <section className="admin-section">
         <h1>Credenciais PlayFivers (agente)</h1>
+        {loading.loadingData && (
+          <p style={{ color: "#999", fontSize: "14px", marginBottom: "10px" }}>
+            Carregando dados...
+          </p>
+        )}
         <form className="admin-form" onSubmit={handleSaveSettings}>
           <input
             placeholder="ID do agente"
@@ -617,7 +664,7 @@ export function AdminPlayfiversPage() {
 
       {/* Provedores Locais */}
       <section className="admin-section">
-        <h2>Provedores (Local)</h2>
+        <h2>Provedores (Local) {providers.length > 0 && `(${providers.length})`}</h2>
         <form className="admin-form" onSubmit={handleCreateProvider}>
           <input
             placeholder="Nome do provedor"
@@ -658,14 +705,22 @@ export function AdminPlayfiversPage() {
             </tr>
           </thead>
           <tbody>
-            {providers.map((p) => (
-              <tr key={p.id}>
-                <td>{p.id}</td>
-                <td>{p.name}</td>
-                <td>{p.externalId}</td>
-                <td>{p.active ? "Ativo" : "Inativo"}</td>
+            {providers.length === 0 ? (
+              <tr>
+                <td colSpan={4} style={{ textAlign: "center", padding: "20px", color: "#999" }}>
+                  Nenhum provedor cadastrado. Adicione um provedor acima ou importe da PlayFivers.
+                </td>
               </tr>
-            ))}
+            ) : (
+              providers.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.id}</td>
+                  <td>{p.name}</td>
+                  <td>{p.externalId}</td>
+                  <td>{p.active ? "Ativo" : "Inativo"}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </section>
@@ -860,7 +915,7 @@ export function AdminPlayfiversPage() {
 
       {/* Jogos Locais */}
       <section className="admin-section">
-        <h2>Jogos (Local)</h2>
+        <h2>Jogos (Local) {games.length > 0 && `(${games.length})`}</h2>
         <form className="admin-form" onSubmit={handleCreateGame}>
           <select
             value={gameForm.providerId}
@@ -952,57 +1007,65 @@ export function AdminPlayfiversPage() {
             </tr>
           </thead>
           <tbody>
-            {games.map((g) => (
-              <tr key={g.id}>
-                <td>{g.id}</td>
-                <td>
-                  {providers.find((p) => p.id === g.providerId)?.name ??
-                    g.providerId}
-                </td>
-                <td>{g.name}</td>
-                <td>{g.externalId}</td>
-                <td>
-                  {g.imageUrl ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <img 
-                        src={g.imageUrl} 
-                        alt={g.name}
-                        style={{ 
-                          width: "50px", 
-                          height: "50px", 
-                          objectFit: "cover",
-                          borderRadius: "4px",
-                          border: "1px solid rgba(255,255,255,0.1)"
-                        }}
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = "none";
-                        }}
-                      />
-                      <a 
-                        href={g.imageUrl} 
-                        target="_blank" 
-                        rel="noreferrer"
-                        style={{ fontSize: "11px", color: "#4caf50" }}
-                      >
-                        Ver
-                      </a>
-                    </div>
-                  ) : (
-                    <span style={{ color: "#666", fontSize: "12px" }}>Sem imagem</span>
-                  )}
-                </td>
-                <td>{g.active ? "Ativo" : "Inativo"}</td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn btn-ghost"
-                    onClick={() => handleSyncGame(g.id)}
-                  >
-                    Enviar para PlayFivers
-                  </button>
+            {games.length === 0 ? (
+              <tr>
+                <td colSpan={7} style={{ textAlign: "center", padding: "20px", color: "#999" }}>
+                  Nenhum jogo cadastrado. Adicione um jogo acima ou importe da PlayFivers.
                 </td>
               </tr>
-            ))}
+            ) : (
+              games.map((g) => (
+                <tr key={g.id}>
+                  <td>{g.id}</td>
+                  <td>
+                    {providers.find((p) => p.id === g.providerId)?.name ??
+                      g.providerId}
+                  </td>
+                  <td>{g.name}</td>
+                  <td>{g.externalId}</td>
+                  <td>
+                    {g.imageUrl ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <img 
+                          src={g.imageUrl} 
+                          alt={g.name}
+                          style={{ 
+                            width: "50px", 
+                            height: "50px", 
+                            objectFit: "cover",
+                            borderRadius: "4px",
+                            border: "1px solid rgba(255,255,255,0.1)"
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                        <a 
+                          href={g.imageUrl} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          style={{ fontSize: "11px", color: "#4caf50" }}
+                        >
+                          Ver
+                        </a>
+                      </div>
+                    ) : (
+                      <span style={{ color: "#666", fontSize: "12px" }}>Sem imagem</span>
+                    )}
+                  </td>
+                  <td>{g.active ? "Ativo" : "Inativo"}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => handleSyncGame(g.id)}
+                    >
+                      Enviar para PlayFivers
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </section>
