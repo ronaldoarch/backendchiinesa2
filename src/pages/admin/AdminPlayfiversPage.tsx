@@ -13,6 +13,7 @@ type Game = {
   providerId: number;
   name: string;
   externalId: string;
+  imageUrl?: string | null;
   active: boolean;
 };
 
@@ -75,8 +76,28 @@ export function AdminPlayfiversPage() {
     name: "",
     externalId: "",
     providerId: 0,
+    imageUrl: "",
     active: true
   });
+
+  // Função para gerar URL da imagem baseada no padrão PlayFivers
+  function generatePlayFiversImageUrl(providerName: string, gameExternalId: string): string {
+    // Normalizar nome do provedor (remover espaços, caracteres especiais)
+    const normalizedProvider = providerName
+      .replace(/\s+/g, "-")
+      .replace(/[^a-zA-Z0-9-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+    
+    // Normalizar ID do jogo (remover espaços, caracteres especiais)
+    const normalizedGameId = gameExternalId
+      .replace(/\s+/g, "-")
+      .replace(/[^a-zA-Z0-9-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
+    
+    return `https://imagensfivers.com/Games/${normalizedProvider}/${normalizedGameId}.webp`;
+  }
 
   useEffect(() => {
     void loadData();
@@ -239,7 +260,7 @@ export function AdminPlayfiversPage() {
     }
   }
 
-  async function handleImportGame(game: PlayFiversGame, localProviderId: number) {
+  async function handleImportGame(game: PlayFiversGame, localProviderId: number, imageUrl?: string) {
     try {
       // Garantir que todos os valores sejam strings (não objetos)
       const gameId = String(game.game_id || game.id || "").trim();
@@ -255,10 +276,15 @@ export function AdminPlayfiversPage() {
         return;
       }
 
+      const localProvider = providers.find((p) => p.id === localProviderId);
+      // Gerar URL automaticamente se não fornecida
+      const finalImageUrl = imageUrl || (localProvider ? generatePlayFiversImageUrl(localProvider.name, gameId) : null);
+
       const response = await api.post("/playfivers/import-game", {
         providerId: Number(localProviderId),
         name: String(name).trim(),
-        externalId: String(gameId).trim()
+        externalId: String(gameId).trim(),
+        imageUrl: finalImageUrl
       });
 
       if (response.data.success) {
@@ -304,13 +330,17 @@ export function AdminPlayfiversPage() {
             return null;
           }
 
+          // Gerar URL da imagem automaticamente
+          const imageUrl = generatePlayFiversImageUrl(localProvider.name, gameId);
+
           return {
             providerId: Number(localProvider.id!),
             name: name,
-            externalId: gameId
+            externalId: gameId,
+            imageUrl: imageUrl
           };
         })
-        .filter((g): g is { providerId: number; name: string; externalId: string } => g !== null && g.name !== "" && g.externalId !== "");
+        .filter((g): g is { providerId: number; name: string; externalId: string; imageUrl: string } => g !== null && g.name !== "" && g.externalId !== "");
 
       if (gamesToImport.length === 0) {
         showMessage("error", "Nenhum jogo válido para importar. Verifique se os jogos têm nome e ID.");
@@ -374,6 +404,7 @@ export function AdminPlayfiversPage() {
       name: "",
       externalId: "",
       providerId: 0,
+      imageUrl: "",
       active: true
     });
       showMessage("success", "Jogo criado com sucesso!");
@@ -753,6 +784,9 @@ export function AdminPlayfiversPage() {
                   return null;
                 }
 
+                // Gerar URL da imagem
+                const imageUrl = localProvider ? generatePlayFiversImageUrl(localProvider.name, gameId) : null;
+
                 return (
                   <div
                     key={`${gameId}-${idx}`}
@@ -766,17 +800,45 @@ export function AdminPlayfiversPage() {
                       borderRadius: "6px"
                     }}
                   >
-                    <div>
-                      <strong>{name || "Sem nome"}</strong>
-                      <br />
-                      <small style={{ color: "#9b9bb2" }}>
-                        ID: {gameId || "N/A"} | Provider: {providerId || "N/A"}
-                      </small>
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1 }}>
+                      {imageUrl && (
+                        <img 
+                          src={imageUrl} 
+                          alt={name}
+                          style={{ 
+                            width: "60px", 
+                            height: "60px", 
+                            objectFit: "cover",
+                            borderRadius: "6px",
+                            border: "1px solid rgba(255,255,255,0.1)"
+                          }}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      )}
+                      <div>
+                        <strong>{name || "Sem nome"}</strong>
+                        <br />
+                        <small style={{ color: "#9b9bb2" }}>
+                          ID: {gameId || "N/A"} | Provider: {providerId || "N/A"}
+                        </small>
+                        {imageUrl && (
+                          <>
+                            <br />
+                            <small style={{ color: "#4caf50", fontSize: "10px" }}>
+                              <a href={imageUrl} target="_blank" rel="noreferrer" style={{ color: "#4caf50" }}>
+                                Ver imagem
+                              </a>
+                            </small>
+                          </>
+                        )}
+                      </div>
                     </div>
                     {localProvider && (
                       <button
                         className="btn btn-ghost"
-                        onClick={() => handleImportGame(pfGame, localProvider.id!)}
+                        onClick={() => handleImportGame(pfGame, localProvider.id!, imageUrl || undefined)}
                         disabled={alreadyImported}
                         style={{ opacity: alreadyImported ? 0.5 : 1 }}
                       >
@@ -826,10 +888,42 @@ export function AdminPlayfiversPage() {
           <input
             placeholder="ID externo do jogo (PlayFivers)"
             value={gameForm.externalId}
+            onChange={(e) => {
+              const externalId = e.target.value;
+              setGameForm((g) => {
+                // Gerar URL automaticamente quando o ID externo e o provedor estiverem preenchidos
+                const provider = providers.find((p) => p.id === g.providerId);
+                const imageUrl = provider && externalId 
+                  ? generatePlayFiversImageUrl(provider.name, externalId)
+                  : g.imageUrl || "";
+                return { ...g, externalId, imageUrl };
+              });
+            }}
+          />
+          <input
+            placeholder="URL da imagem (gerada automaticamente)"
+            value={gameForm.imageUrl || ""}
             onChange={(e) =>
-              setGameForm((g) => ({ ...g, externalId: e.target.value }))
+              setGameForm((g) => ({ ...g, imageUrl: e.target.value }))
             }
           />
+          {gameForm.imageUrl && (
+            <div style={{ marginBottom: "10px" }}>
+              <img 
+                src={gameForm.imageUrl} 
+                alt="Preview" 
+                style={{ 
+                  maxWidth: "200px", 
+                  maxHeight: "150px", 
+                  borderRadius: "8px",
+                  border: "1px solid rgba(255,255,255,0.1)"
+                }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+            </div>
+          )}
           <label className="checkbox-line">
             <input
               type="checkbox"
@@ -852,6 +946,7 @@ export function AdminPlayfiversPage() {
               <th>Provedor</th>
               <th>Nome</th>
               <th>Externo</th>
+              <th>Imagem</th>
               <th>Status</th>
               <th>Ações</th>
             </tr>
@@ -866,6 +961,36 @@ export function AdminPlayfiversPage() {
                 </td>
                 <td>{g.name}</td>
                 <td>{g.externalId}</td>
+                <td>
+                  {g.imageUrl ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <img 
+                        src={g.imageUrl} 
+                        alt={g.name}
+                        style={{ 
+                          width: "50px", 
+                          height: "50px", 
+                          objectFit: "cover",
+                          borderRadius: "4px",
+                          border: "1px solid rgba(255,255,255,0.1)"
+                        }}
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                      <a 
+                        href={g.imageUrl} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        style={{ fontSize: "11px", color: "#4caf50" }}
+                      >
+                        Ver
+                      </a>
+                    </div>
+                  ) : (
+                    <span style={{ color: "#666", fontSize: "12px" }}>Sem imagem</span>
+                  )}
+                </td>
                 <td>{g.active ? "Ativo" : "Inativo"}</td>
                 <td>
                   <button

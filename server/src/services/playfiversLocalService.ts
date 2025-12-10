@@ -37,14 +37,15 @@ export async function createGameFromPlayfivers(data: {
   providerId: number;
   name: string;
   externalId: string;
+  imageUrl?: string | null;
 }) {
   const [result] = await pool.query(
-    "INSERT INTO games (provider_id, name, external_id, active) VALUES (?, ?, ?, ?)",
-    [data.providerId, data.name, data.externalId, true]
+    "INSERT INTO games (provider_id, name, external_id, image_url, active) VALUES (?, ?, ?, ?, ?)",
+    [data.providerId, data.name, data.externalId, data.imageUrl || null, true]
   );
 
   const [rows] = await pool.query(
-    `SELECT g.id, g.provider_id as providerId, g.name, g.external_id as externalId, g.active
+    `SELECT g.id, g.provider_id as providerId, g.name, g.external_id as externalId, g.image_url as imageUrl, g.active
        FROM games g WHERE g.id = ?`,
     [(result as any).insertId]
   );

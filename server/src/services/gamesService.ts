@@ -5,6 +5,7 @@ export type Game = {
   providerId: number;
   name: string;
   externalId: string;
+  imageUrl: string | null;
   active: boolean;
 };
 
@@ -14,6 +15,7 @@ export async function listGames(): Promise<Game[]> {
             g.provider_id as providerId,
             g.name,
             g.external_id as externalId,
+            g.image_url as imageUrl,
             g.active
        FROM games g
    ORDER BY g.id DESC`
@@ -25,16 +27,17 @@ export async function createGame(data: {
   providerId: number;
   name: string;
   externalId: string;
+  imageUrl?: string | null;
   active: boolean;
 }): Promise<Game> {
   const [result] = await pool.query(
-    `INSERT INTO games (provider_id, name, external_id, active)
-     VALUES (?, ?, ?, ?)`,
-    [data.providerId, data.name, data.externalId, data.active]
+    `INSERT INTO games (provider_id, name, external_id, image_url, active)
+     VALUES (?, ?, ?, ?, ?)`,
+    [data.providerId, data.name, data.externalId, data.imageUrl || null, data.active]
   );
 
   const [rows] = await pool.query(
-    `SELECT id, provider_id as providerId, name, external_id as externalId, active
+    `SELECT id, provider_id as providerId, name, external_id as externalId, image_url as imageUrl, active
      FROM games WHERE id = ?`,
     [(result as any).insertId]
   );
@@ -47,7 +50,9 @@ export async function findGameWithProvider(id: number) {
     `SELECT g.id,
             g.name,
             g.external_id as externalId,
-            p.external_id as providerExternalId
+            g.image_url as imageUrl,
+            p.external_id as providerExternalId,
+            p.name as providerName
        FROM games g
        JOIN providers p ON p.id = g.provider_id
       WHERE g.id = ?`,
@@ -58,9 +63,60 @@ export async function findGameWithProvider(id: number) {
         id: number;
         name: string;
         externalId: string;
+        imageUrl: string | null;
         providerExternalId: string;
+        providerName: string;
       }
     | undefined;
+}
+
+export async function updateGame(
+  id: number,
+  data: Partial<{
+    name: string;
+    externalId: string;
+    imageUrl: string | null;
+    active: boolean;
+  }>
+): Promise<Game | null> {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+
+  if (data.name !== undefined) {
+    fields.push("name = ?");
+    values.push(data.name);
+  }
+  if (data.externalId !== undefined) {
+    fields.push("external_id = ?");
+    values.push(data.externalId);
+  }
+  if (data.imageUrl !== undefined) {
+    fields.push("image_url = ?");
+    values.push(data.imageUrl);
+  }
+  if (data.active !== undefined) {
+    fields.push("active = ?");
+    values.push(data.active);
+  }
+
+  if (!fields.length) {
+    throw new Error("Nada para atualizar");
+  }
+
+  values.push(id);
+  const [result] = await pool.query(
+    `UPDATE games SET ${fields.join(", ")} WHERE id = ?`,
+    values
+  );
+  
+  if ((result as any).affectedRows === 0) return null;
+
+  const [rows] = await pool.query(
+    `SELECT id, provider_id as providerId, name, external_id as externalId, image_url as imageUrl, active
+     FROM games WHERE id = ?`,
+    [id]
+  );
+  return (rows as Game[])[0];
 }
 
 

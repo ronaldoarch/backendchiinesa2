@@ -32,10 +32,19 @@ export async function initDb() {
         provider_id INT NOT NULL,
         name VARCHAR(255) NOT NULL,
         external_id VARCHAR(255),
+        image_url TEXT,
         active BOOLEAN NOT NULL DEFAULT true,
         FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE CASCADE
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    // Adicionar coluna image_url se não existir (para bancos já existentes)
+    await connection.query(`
+      ALTER TABLE games 
+      ADD COLUMN IF NOT EXISTS image_url TEXT
+    `).catch(() => {
+      // Ignorar erro se a coluna já existir
+    });
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS banners (

@@ -1,12 +1,13 @@
 import { Request, Response } from "express";
 import { z } from "zod";
-import { createGame, findGameWithProvider, listGames } from "../services/gamesService";
+import { createGame, findGameWithProvider, listGames, updateGame } from "../services/gamesService";
 import { playFiversService } from "../services/playfivers-v2";
 
 const gameSchema = z.object({
   providerId: z.number(),
   name: z.string(),
   externalId: z.string(),
+  imageUrl: z.string().nullable().optional(),
   active: z.boolean().default(true)
 });
 
@@ -24,6 +25,40 @@ export async function createGameController(req: Request, res: Response): Promise
 
   const game = await createGame(parsed.data);
   res.status(201).json(game);
+}
+
+export async function updateGameController(req: Request, res: Response): Promise<void> {
+  const id = Number(req.params.id);
+  if (Number.isNaN(id)) {
+    res.status(400).json({ error: "ID inválido" });
+    return;
+  }
+
+  const { name, externalId, imageUrl, active } = req.body;
+
+  const updateData: any = {};
+  if (name !== undefined) updateData.name = String(name).trim();
+  if (externalId !== undefined) updateData.externalId = String(externalId).trim();
+  if (imageUrl !== undefined) updateData.imageUrl = imageUrl ? String(imageUrl).trim() : null;
+  if (active !== undefined) updateData.active = Boolean(active);
+
+  if (Object.keys(updateData).length === 0) {
+    res.status(400).json({ error: "Nenhum campo para atualizar" });
+    return;
+  }
+
+  try {
+    const game = await updateGame(id, updateData);
+    if (!game) {
+      res.status(404).json({ error: "Jogo não encontrado" });
+      return;
+    }
+    res.json(game);
+  } catch (error: any) {
+    // eslint-disable-next-line no-console
+    console.error("Erro ao atualizar jogo:", error);
+    res.status(500).json({ error: error.message });
+  }
 }
 
 export async function syncGamePlayfiversController(req: Request, res: Response): Promise<void> {

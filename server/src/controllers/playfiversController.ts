@@ -99,12 +99,13 @@ export async function importProviderController(req: Request, res: Response): Pro
 
 export async function importGameController(req: Request, res: Response): Promise<void> {
   try {
-    const { providerId, name, externalId } = req.body;
+    const { providerId, name, externalId, imageUrl } = req.body;
 
     // Validar e converter tipos
     const providerIdNum = Number(providerId);
     const nameStr = String(name || "").trim();
     const externalIdStr = String(externalId || "").trim();
+    const imageUrlStr = imageUrl ? String(imageUrl).trim() : null;
 
     if (!providerIdNum || isNaN(providerIdNum) || providerIdNum <= 0) {
       res.status(400).json({
@@ -152,7 +153,8 @@ export async function importGameController(req: Request, res: Response): Promise
     const game = await createGameFromPlayfivers({
       providerId: providerIdNum,
       name: nameStr,
-      externalId: externalIdStr
+      externalId: externalIdStr,
+      imageUrl: imageUrlStr
     });
 
     res.json({
@@ -230,12 +232,13 @@ export async function importGamesBulkController(req: Request, res: Response): Pr
 
     for (const game of games) {
       try {
-        const { providerId, name, externalId } = game;
+        const { providerId, name, externalId, imageUrl } = game;
         
         // Validar e converter tipos
         const providerIdNum = Number(providerId);
         const nameStr = String(name || "").trim();
         const externalIdStr = String(externalId || "").trim();
+        const imageUrlStr = imageUrl ? String(imageUrl).trim() : null;
 
         if (!providerIdNum || isNaN(providerIdNum) || providerIdNum <= 0) {
           errors.push({ game, error: `ID do provedor inválido: ${providerId}` });
@@ -265,7 +268,8 @@ export async function importGamesBulkController(req: Request, res: Response): Pr
         const created = await createGameFromPlayfivers({
           providerId: providerIdNum,
           name: nameStr,
-          externalId: externalIdStr
+          externalId: externalIdStr,
+          imageUrl: imageUrlStr
         });
         imported.push(created);
       } catch (error: any) {

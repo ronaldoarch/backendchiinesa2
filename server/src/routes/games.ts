@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   createGameController,
   listGamesController,
+  updateGameController,
   syncGamePlayfiversController
 } from "../controllers/gamesController";
 import { asyncHandler } from "../middleware/asyncHandler";
@@ -14,5 +15,6 @@ gamesRouter.get("/", asyncHandler(listGamesController));
 
 // POST requer autenticação e admin
 gamesRouter.post("/", authenticate, requireAdmin, asyncHandler(createGameController));
+gamesRouter.put("/:id", authenticate, requireAdmin, asyncHandler(updateGameController));
 gamesRouter.post("/:id/sync-playfivers", authenticate, requireAdmin, asyncHandler(syncGamePlayfiversController));
 
