@@ -186,12 +186,17 @@ export function AdminPlayfiversPage() {
     }
   }
 
-  async function handleFetchGames(providerId?: string) {
+  async function handleFetchGames(providerId?: string, limit?: number) {
     setLoading((prev) => ({ ...prev, fetchGames: true }));
     try {
-      const url = providerId
+      let url = providerId
         ? `/playfivers/games?provider_id=${providerId}`
         : "/playfivers/games";
+      // Adicionar parâmetro limit se fornecido (para testar se a API suporta paginação)
+      // Nota: A documentação não menciona este parâmetro, mas vamos testar
+      if (limit && limit > 0) {
+        url += (url.includes("?") ? "&" : "?") + `limit=${limit}`;
+      }
       const response = await api.get(url);
       if (response.data.success && response.data.data) {
         setPlayfiversGames(response.data.data);
@@ -660,9 +665,43 @@ export function AdminPlayfiversPage() {
                 </option>
               ))}
           </select>
+          <input
+            type="number"
+            placeholder="Limite (ex: 100)"
+            min="1"
+            max="10000"
+            value={""}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val === "" || (Number(val) > 0 && Number(val) <= 10000)) {
+                // Armazenar em estado se necessário
+              }
+            }}
+            style={{
+              padding: "10px",
+              marginRight: "10px",
+              background: "var(--bg-elevated)",
+              color: "var(--text-main)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "6px",
+              width: "120px"
+            }}
+            onKeyPress={(e) => {
+              if (e.key === "Enter") {
+                const limit = Number((e.target as HTMLInputElement).value);
+                if (limit > 0) {
+                  handleFetchGames(selectedProviderForGames || undefined, limit);
+                }
+              }
+            }}
+          />
           <button
             className="btn btn-gold"
-            onClick={() => handleFetchGames(selectedProviderForGames || undefined)}
+            onClick={() => {
+              const limitInput = document.querySelector('input[placeholder="Limite (ex: 100)"]') as HTMLInputElement;
+              const limit = limitInput?.value ? Number(limitInput.value) : undefined;
+              handleFetchGames(selectedProviderForGames || undefined, limit);
+            }}
             disabled={loading.fetchGames}
           >
             {loading.fetchGames ? "Buscando..." : "Buscar Jogos"}

@@ -41,7 +41,10 @@ export async function listProvidersPlayfiversController(_req: Request, res: Resp
 export async function listGamesPlayfiversController(req: Request, res: Response): Promise<void> {
   try {
     const providerId = req.query.provider_id as string | undefined;
-    const result = await playFiversService.getAvailableGames(providerId);
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    const page = req.query.page ? Number(req.query.page) : undefined;
+    
+    const result = await playFiversService.getAvailableGames(providerId, limit, page);
     if (!result.success) {
       res.status(400).json(result);
       return;
