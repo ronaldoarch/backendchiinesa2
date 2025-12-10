@@ -1069,16 +1069,16 @@ body {
   width: 92%;
   max-width: 380px;
   border-radius: 18px;
-  background: radial-gradient(circle at top, #1b1f2a 0%, #0f121a 100%);
-  border: 1px solid rgba(54, 189, 95, 0.25);
+  background: linear-gradient(180deg, rgba(12, 10, 18, 0.95) 0%, rgba(5, 5, 8, 0.98) 100%);
+  border: 1px solid rgba(246, 196, 83, 0.35);
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.85);
   padding: 18px 18px 12px;
-  color: #f8f9fb;
+  color: var(--text-main);
 }
 
 .auth-modal-header.modern {
   padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(246, 196, 83, 0.25);
   margin-bottom: 12px;
 }
 
@@ -1094,13 +1094,13 @@ body {
   border-radius: 10px;
   display: grid;
   place-items: center;
-  background: linear-gradient(135deg, #2ecc71, #16a34a);
-  box-shadow: 0 10px 25px rgba(46, 204, 113, 0.35);
+  background: linear-gradient(135deg, var(--gold-soft), var(--gold-dark));
+  box-shadow: 0 10px 25px rgba(246, 196, 83, 0.35);
 }
 
 .auth-subtitle {
   margin: 0;
-  color: #9aa4b5;
+  color: var(--text-muted);
   font-size: 12px;
 }
 
@@ -1120,16 +1120,16 @@ body {
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
-  color: #c7d1de;
+  color: var(--text-main);
 }
 
 .auth-modal-form input,
 .auth-modal-form select {
-  background: #0d1119;
+  background: var(--bg-card);
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(246, 196, 83, 0.22);
   padding: 10px 12px;
-  color: #f8f9fb;
+  color: var(--text-main);
   font-size: 13px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -1137,8 +1137,8 @@ body {
 .auth-modal-form input:focus,
 .auth-modal-form select:focus {
   outline: none;
-  border-color: rgba(46, 204, 113, 0.8);
-  box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.2);
+  border-color: rgba(246, 196, 83, 0.6);
+  box-shadow: 0 0 0 3px rgba(246, 196, 83, 0.2);
 }
 
 .input-group {
@@ -1150,10 +1150,10 @@ body {
 
 .input-prefix {
   padding: 10px 12px;
-  background: #0b0e15;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-elevated);
+  border: 1px solid rgba(246, 196, 83, 0.22);
   border-radius: 10px;
-  color: #c7d1de;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -1165,8 +1165,8 @@ body {
 }
 
 .select-flag .flag {
-  background: #0b0e15;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-elevated);
+  border: 1px solid rgba(246, 196, 83, 0.22);
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 14px;
@@ -1177,7 +1177,7 @@ body {
   align-items: center;
   gap: 8px;
   font-size: 11px;
-  color: #9aa4b5;
+  color: var(--text-muted);
 }
 
 .strength-bars {
@@ -1190,13 +1190,13 @@ body {
   flex: 1;
   height: 6px;
   border-radius: 999px;
-  background: #1c2330;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--bg-elevated);
+  border: 1px solid rgba(246, 196, 83, 0.22);
 }
 
 .strength-bar.filled {
-  background: linear-gradient(135deg, #2ecc71, #16a34a);
-  border-color: rgba(46, 204, 113, 0.8);
+  background: linear-gradient(135deg, var(--gold-soft), var(--gold-dark));
+  border-color: rgba(246, 196, 83, 0.8);
 }
 
 .auth-modal-checkline {
@@ -1206,7 +1206,7 @@ body {
 
 .auth-modal-checkline input {
   margin-top: 5px;
-  accent-color: #2ecc71;
+  accent-color: var(--gold);
 }
 
 .auth-modal-checkline span {
@@ -1220,7 +1220,7 @@ body {
 .link-inline {
   border: none;
   background: none;
-  color: #2ecc71;
+  color: var(--gold);
   font-size: 12px;
   text-decoration: underline;
   cursor: pointer;
@@ -1239,15 +1239,16 @@ body {
 .auth-modern-submit {
   margin-top: 6px;
   width: 100%;
-  background: linear-gradient(135deg, #2ecc71, #16a34a);
-  color: #0a0f14;
+  background: linear-gradient(135deg, var(--gold-soft), var(--gold-dark));
+  color: #120c04;
   border: none;
   padding: 12px;
   border-radius: 12px;
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  box-shadow: 0 16px 40px rgba(46, 204, 113, 0.4);
+  box-shadow: 0 16px 40px rgba(246, 196, 83, 0.4);
+  text-transform: uppercase;
 }
 
 .auth-modern-submit:disabled {
@@ -1264,16 +1265,21 @@ body {
 }
 
 .auth-modal-footer.modern {
-  color: #c7d1de;
+  color: var(--text-muted);
 }
 
 .auth-footer-link {
   border: none;
   background: none;
-  color: #2ecc71;
+  color: var(--gold);
   cursor: pointer;
   padding: 0;
   font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.auth-footer-link:hover {
+  color: var(--gold-soft);
 }
 
 
