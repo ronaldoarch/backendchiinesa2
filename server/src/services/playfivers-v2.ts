@@ -3,8 +3,10 @@ import { pool } from "../config/database";
 import { RowDataPacket } from "mysql2";
 
 // Configurações da API PlayFivers
+// Base URL: https://api.playfivers.com
+// API v2: /api/v2/*
 const PLAYFIVERS_BASE_URL =
-  process.env.PLAYFIVERS_BASE_URL ?? "https://api.playfivers.com/api";
+  process.env.PLAYFIVERS_BASE_URL ?? "https://api.playfivers.com";
 
 interface PlayFiversCredentials {
   agentId: string;
@@ -31,10 +33,10 @@ async function getCredentialsFromDb(): Promise<Partial<PlayFiversCredentials>> {
 
     for (const row of rows) {
       const key = row.key.replace("playfivers.", "");
-      if (key === "agentId") credentials.agentId = row.value;
-      if (key === "secret") credentials.agentSecret = row.value;
-      if (key === "token") credentials.agentToken = row.value;
-      if (key === "authMethod") credentials.authMethod = row.value;
+      if (key === "agentId" || key === "agent_id") credentials.agentId = row.value;
+      if (key === "secret" || key === "secretKey" || key === "secret_key") credentials.agentSecret = row.value;
+      if (key === "token" || key === "agentToken" || key === "agent_token") credentials.agentToken = row.value;
+      if (key === "authMethod" || key === "auth_method") credentials.authMethod = row.value;
     }
 
     return credentials;
@@ -55,12 +57,16 @@ async function getCredentials(): Promise<PlayFiversCredentials> {
     agentSecret:
       process.env.PLAYFIVERS_AGENT_SECRET || dbCreds.agentSecret || "",
     agentToken: process.env.PLAYFIVERS_AGENT_TOKEN || dbCreds.agentToken || "",
-    authMethod: process.env.PLAYFIVERS_AUTH_METHOD || dbCreds.authMethod || "bearer"
+    authMethod: process.env.PLAYFIVERS_AUTH_METHOD || dbCreds.authMethod || "agent" // Padrão: agent (body)
   };
 }
 
 /**
  * Criar cliente HTTP com autenticação apropriada
+ * 
+ * IMPORTANTE: Segundo a documentação oficial da PlayFivers,
+ * a autenticação é feita via agentToken e secretKey no BODY das requisições,
+ * NÃO via headers Authorization.
  */
 async function createClient(): Promise<AxiosInstance> {
   const creds = await getCredentials();
@@ -70,11 +76,12 @@ async function createClient(): Promise<AxiosInstance> {
   };
 
   // Validar credenciais
-  if (!creds.agentToken && !creds.agentId) {
-    throw new Error("Credenciais PlayFivers não configuradas. Configure agentToken ou agentId/agentSecret.");
+  if (!creds.agentToken && (!creds.agentId || !creds.agentSecret)) {
+    throw new Error("Credenciais PlayFivers não configuradas. Configure agentToken/secretKey ou agentId/agentSecret.");
   }
 
-  // Configurar autenticação baseado no método
+  // Segundo a documentação, a autenticação padrão é via body (agentToken + secretKey)
+  // Mas mantemos suporte a outros métodos para flexibilidade
   switch (creds.authMethod.toLowerCase()) {
     case "api_key":
       if (creds.agentToken) {
@@ -87,9 +94,12 @@ async function createClient(): Promise<AxiosInstance> {
       }
       break;
     case "agent":
-      // Autenticação será no body de cada requisição
-      if (!creds.agentId || !creds.agentSecret) {
-        throw new Error("Para autenticação 'agent', agentId e agentSecret são obrigatórios.");
+    case "body":
+    default:
+      // Autenticação no body (padrão da PlayFivers)
+      // agentToken e secretKey serão incluídos no body de cada requisição
+      if (!creds.agentToken || !creds.agentSecret) {
+        throw new Error("Para autenticação 'agent' (padrão PlayFivers), agentToken e secretKey são obrigatórios.");
       }
       break;
     case "basic":
@@ -99,11 +109,6 @@ async function createClient(): Promise<AxiosInstance> {
         headers["Authorization"] = `Basic ${basicAuth}`;
       }
       break;
-    default:
-      // Tentar Bearer por padrão
-      if (creds.agentToken) {
-        headers["Authorization"] = `Bearer ${creds.agentToken}`;
-      }
   }
 
   const client = axios.create({
@@ -141,6 +146,41 @@ async function createClient(): Promise<AxiosInstance> {
   );
 
   return client;
+}
+
+/**
+ * Adicionar credenciais de autenticação ao body da requisição
+ * (Conforme documentação oficial da PlayFivers)
+ */
+async function addAuthToBody(body: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const creds = await getCredentials();
+  
+  // Se usar autenticação no body (padrão PlayFivers)
+  if (creds.authMethod.toLowerCase() === "agent" || 
+      creds.authMethod.toLowerCase() === "body" || 
+      !creds.authMethod || 
+      creds.authMethod.toLowerCase() === "default") {
+    
+    // Segundo a documentação: agentToken e secretKey (ou agent_code e agent_secret)
+    if (creds.agentToken && creds.agentSecret) {
+      return {
+        ...body,
+        agentToken: creds.agentToken,
+        secretKey: creds.agentSecret,
+        // Também tentar formato alternativo
+        agent_token: creds.agentToken,
+        secret_key: creds.agentSecret
+      };
+    } else if (creds.agentId && creds.agentSecret) {
+      return {
+        ...body,
+        agent_code: creds.agentId,
+        agent_secret: creds.agentSecret
+      };
+    }
+  }
+  
+  return body;
 }
 
 // Tipos
@@ -190,96 +230,56 @@ export const playFiversService = {
 
   /**
    * Registrar jogo na PlayFivers
+   * NOTA: Segundo a documentação, não há endpoint específico para "registrar" jogo.
+   * Os jogos são listados via GET /api/v2/games e iniciados via POST /api/v2/game_launch
+   * Esta função pode não ser necessária, mas mantemos para compatibilidade
    */
   async registerGame(
     payload: RegisterGamePayload
   ): Promise<PlayFiversResponse> {
     try {
       const client = await createClient();
-      const creds = await getCredentials();
 
-      // Preparar dados conforme método de autenticação
-      const requestData: Record<string, unknown> = {
-        provider_id: payload.providerExternalId,
-        providerId: payload.providerExternalId, // Tentar ambos os formatos
-        game_id: payload.gameExternalId,
-        gameId: payload.gameExternalId, // Tentar ambos os formatos
-        name: payload.name,
-        title: payload.name // Algumas APIs usam 'title' em vez de 'name'
-      };
+      // Preparar dados com autenticação
+      const requestData = await addAuthToBody({
+        provider_code: payload.providerExternalId,
+        game_code: payload.gameExternalId,
+        name: payload.name
+      });
 
-      if (creds.authMethod === "agent") {
-        requestData.agent_id = creds.agentId;
-        requestData.agent_secret = creds.agentSecret;
-      }
-
-      // Tentar múltiplos endpoints possíveis
-      const endpoints = [
-        "/v1/games",
-        "/games",
-        "/casino/games",
-        "/api/v1/games",
-        "/agent/games",
-        "/v1/agent/games",
-        "/v1/casino/games"
-      ];
-
-      let lastError: Error | null = null;
-      let lastResponse: any = null;
-
-      for (const endpoint of endpoints) {
-        try {
-          const { data } = await client.post(endpoint, requestData);
-
-          // eslint-disable-next-line no-console
-          console.log(`✅ Jogo registrado com sucesso via ${endpoint}: ${payload.name}`);
-
+      // Tentar endpoint de game_launch (mais próximo do que seria "registrar")
+      try {
+        const { data } = await client.post("/api/v2/game_launch", requestData);
+        
+        // eslint-disable-next-line no-console
+        console.log(`✅ Jogo processado: ${payload.name}`);
+        
+        return {
+          success: true,
+          data,
+          message: "Jogo processado com sucesso"
+        };
+      } catch (error: any) {
+        // Se game_launch falhar, retornar erro específico
+        if (error.response?.status === 401 || error.response?.status === 403) {
           return {
-            success: true,
-            data,
-            message: "Jogo registrado com sucesso"
+            success: false,
+            error: "Credenciais inválidas ou sem permissão",
+            message: `Erro de autenticação (status: ${error.response.status})`
           };
-        } catch (error: any) {
-          lastError = error;
-          lastResponse = error.response;
-
-          // Se for 404, tentar próximo endpoint
-          if (error.response?.status === 404) {
-            continue;
-          }
-
-          // Se for 401/403, credenciais podem estar erradas
-          if (error.response?.status === 401 || error.response?.status === 403) {
-            return {
-              success: false,
-              error: "Credenciais inválidas ou sem permissão",
-              message: `Erro de autenticação ao registrar jogo (status: ${error.response.status})`
-            };
-          }
-
-          // Se for 400, pode ser dados inválidos
-          if (error.response?.status === 400) {
-            return {
-              success: false,
-              error: error.response.data?.message || "Dados inválidos",
-              message: `Erro ao registrar jogo: ${error.response.data?.message || "Dados inválidos"}`
-            };
-          }
-
-          // Para outros erros, não tentar mais endpoints
-          break;
         }
+        
+        if (error.response?.status === 422) {
+          return {
+            success: false,
+            error: "Game_code incorreto ou corpo inválido",
+            message: "Verifique se o game_code e provider_code estão corretos"
+          };
+        }
+        
+        throw error;
       }
 
-      const errorMessage = lastResponse
-        ? `Todos os endpoints falharam. Último erro: ${lastResponse.status} - ${lastError?.message}`
-        : `Todos os endpoints falharam. ${lastError?.message || "Erro desconhecido"}`;
-
-      return {
-        success: false,
-        error: errorMessage,
-        message: "Erro ao registrar jogo"
-      };
     } catch (error: any) {
       // eslint-disable-next-line no-console
       console.error("❌ Erro ao registrar jogo na PlayFivers:", error.message);
@@ -294,6 +294,9 @@ export const playFiversService = {
 
   /**
    * Registrar provedor na PlayFivers
+   * NOTA: Segundo a documentação, não há endpoint específico para "registrar" provedor.
+   * Os provedores são listados via GET /api/v2/providers
+   * Esta função pode não ser necessária, mas mantemos para compatibilidade
    */
   async registerProvider(
     providerExternalId: string,
@@ -301,82 +304,22 @@ export const playFiversService = {
   ): Promise<PlayFiversResponse> {
     try {
       const client = await createClient();
-      const creds = await getCredentials();
 
-      const requestData: Record<string, unknown> = {
-        provider_id: providerExternalId,
-        providerId: providerExternalId, // Tentar ambos os formatos
-        name: providerName,
-        title: providerName // Algumas APIs usam 'title'
-      };
+      // Preparar dados com autenticação
+      const requestData = await addAuthToBody({
+        provider_code: providerExternalId,
+        name: providerName
+      });
 
-      if (creds.authMethod === "agent") {
-        requestData.agent_id = creds.agentId;
-        requestData.agent_secret = creds.agentSecret;
-      }
-
-      // Tentar múltiplos endpoints
-      const endpoints = [
-        "/v1/providers",
-        "/providers",
-        "/agent/providers",
-        "/v1/agent/providers",
-        "/v1/casino/providers",
-        "/casino/providers"
-      ];
-
-      let lastError: Error | null = null;
-      let lastResponse: any = null;
-
-      for (const endpoint of endpoints) {
-        try {
-          const { data } = await client.post(endpoint, requestData);
-          
-          // eslint-disable-next-line no-console
-          console.log(`✅ Provedor registrado com sucesso via ${endpoint}: ${providerName}`);
-          
-          return {
-            success: true,
-            data,
-            message: "Provedor registrado com sucesso"
-          };
-        } catch (error: any) {
-          lastError = error;
-          lastResponse = error.response;
-
-          if (error.response?.status === 404) continue;
-
-          // Se for 401/403, credenciais podem estar erradas
-          if (error.response?.status === 401 || error.response?.status === 403) {
-            return {
-              success: false,
-              error: "Credenciais inválidas ou sem permissão",
-              message: `Erro de autenticação ao registrar provedor (status: ${error.response.status})`
-            };
-          }
-
-          // Se for 400, pode ser dados inválidos
-          if (error.response?.status === 400) {
-            return {
-              success: false,
-              error: error.response.data?.message || "Dados inválidos",
-              message: `Erro ao registrar provedor: ${error.response.data?.message || "Dados inválidos"}`
-            };
-          }
-
-          // Para outros erros, não tentar mais endpoints
-          break;
-        }
-      }
-
-      const errorMessage = lastResponse
-        ? `Todos os endpoints falharam. Último erro: ${lastResponse.status} - ${lastError?.message}`
-        : `Todos os endpoints falharam. ${lastError?.message || "Erro desconhecido"}`;
-
+      // Como não há endpoint de registro, apenas retornar sucesso
+      // O provedor já existe na lista retornada por GET /api/v2/providers
+      // eslint-disable-next-line no-console
+      console.log(`ℹ️ Provedor "${providerName}" será importado do banco local. Use GET /api/v2/providers para listar.`);
+      
       return {
-        success: false,
-        error: errorMessage,
-        message: "Erro ao registrar provedor"
+        success: true,
+        data: { provider_code: providerExternalId, name: providerName },
+        message: "Provedor pode ser importado. Use a listagem de provedores para verificar disponibilidade."
       };
     } catch (error: any) {
       // eslint-disable-next-line no-console
@@ -392,6 +335,7 @@ export const playFiversService = {
 
   /**
    * Testar conexão com a API
+   * Usa GET /api/v2/agent conforme documentação oficial
    */
   async testConnection(): Promise<PlayFiversResponse> {
     try {
@@ -408,73 +352,41 @@ export const playFiversService = {
 
       const client = await createClient();
 
-      // Tentar múltiplos endpoints de health check e info
-      const endpoints = [
-        "/health",
-        "/",
-        "/v1/health",
-        "/api/health",
-        "/v1/status",
-        "/status",
-        "/v1/info",
-        "/info",
-        "/v1/agent/info",
-        "/agent/info"
-      ];
-
-      let lastError: Error | null = null;
-      let lastResponse: any = null;
-
-      for (const endpoint of endpoints) {
+      // Segundo a documentação: GET /api/v2/agent para testar conexão
+      // Requer agentToken e secretKey no body (mesmo para GET, pode precisar no body)
+      try {
+        const authBody = await addAuthToBody({});
+        // Tentar POST primeiro (algumas APIs requerem body mesmo para "get info")
+        let response;
         try {
-          const { data, status } = await client.get(endpoint);
-          
-          // Se recebeu resposta, mesmo que seja erro de auth, a API está acessível
-          return {
-            success: true,
-            data,
-            message: `Conexão OK (endpoint: ${endpoint}, status: ${status})`
-          };
-        } catch (error: any) {
-          lastError = error;
-          lastResponse = error.response;
-
-          // Se for 404, tentar próximo endpoint
-          if (error.response?.status === 404) {
-            continue;
-          }
-
-          // Se for 401/403, a API está acessível mas as credenciais podem estar erradas
-          if (error.response?.status === 401 || error.response?.status === 403) {
-            return {
-              success: false,
-              error: "Credenciais inválidas ou sem permissão",
-              message: `API acessível mas autenticação falhou (status: ${error.response.status}). Verifique as credenciais.`,
-              data: error.response.data
-            };
-          }
-
-          // Se recebeu resposta (mesmo que erro), a API está acessível
-          if (error.response) {
-            return {
-              success: true,
-              message: `API acessível (endpoint: ${endpoint}, status: ${error.response.status})`,
-              data: error.response.data
-            };
+          response = await client.post("/api/v2/agent", authBody);
+        } catch (postError: any) {
+          // Se POST falhar com 405, tentar GET
+          if (postError.response?.status === 405) {
+            response = await client.get("/api/v2/agent", { data: authBody });
+          } else {
+            throw postError;
           }
         }
+        
+        const { data, status } = response;
+        
+        return {
+          success: true,
+          data,
+          message: `Conexão OK! Informações do agente obtidas (status: ${status})`
+        };
+      } catch (error: any) {
+        // Se for 401/403, credenciais podem estar erradas
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          return {
+            success: false,
+            error: "Credenciais inválidas ou sem permissão",
+            message: `Erro de autenticação (status: ${error.response.status}). Verifique agentToken e secretKey.`
+          };
+        }
+        throw error;
       }
-
-      // Se nenhum endpoint respondeu
-      const errorMessage = lastResponse
-        ? `Nenhum endpoint respondeu corretamente. Último erro: ${lastResponse.status} - ${lastError?.message}`
-        : `Nenhum endpoint respondeu. Verifique se a URL base está correta: ${PLAYFIVERS_BASE_URL}`;
-
-      return {
-        success: false,
-        error: errorMessage,
-        message: "Falha na conexão com a API PlayFivers"
-      };
     } catch (error: any) {
       // eslint-disable-next-line no-console
       console.error("❌ Erro ao testar conexão com PlayFivers:", error.message);
@@ -489,98 +401,70 @@ export const playFiversService = {
 
   /**
    * Buscar lista de provedores disponíveis na PlayFivers
+   * Endpoint oficial: GET /api/v2/providers
+   * Requer agentToken e secretKey no body
    */
   async getAvailableProviders(): Promise<PlayFiversResponse<PlayFiversProvider[]>> {
     try {
       const client = await createClient();
-      const creds = await getCredentials();
 
-      // Preparar request config baseado no método de autenticação
-      const requestConfig: any = {};
+      // Segundo a documentação: GET /api/v2/providers
+      // Autenticação via body (agentToken + secretKey)
+      const authBody = await addAuthToBody({});
+      
+      try {
+        // Tentar POST primeiro (conforme documentação pode requerer body)
+        const { data } = await client.post("/api/v2/providers", authBody);
+        
+        // Normalizar resposta
+        let providers: PlayFiversProvider[] = [];
+        if (data.data && Array.isArray(data.data)) {
+          providers = data.data;
+        } else if (Array.isArray(data)) {
+          providers = data;
+        }
 
-      // Se usar autenticação agent, pode precisar incluir no body ou params
-      if (creds.authMethod === "agent") {
-        requestConfig.params = {
-          agent_id: creds.agentId,
-          agent_secret: creds.agentSecret
-        };
-      }
-
-      // Tentar múltiplos endpoints possíveis
-      const endpoints = [
-        "/v1/providers",
-        "/providers",
-        "/agent/providers",
-        "/api/v1/providers",
-        "/v1/casino/providers",
-        "/casino/providers"
-      ];
-
-      let lastError: Error | null = null;
-
-      for (const endpoint of endpoints) {
-        try {
-          const { data } = await client.get(endpoint, requestConfig);
-
-          // Normalizar resposta (pode vir em diferentes formatos)
+        if (providers.length > 0) {
+          // eslint-disable-next-line no-console
+          console.log(`✅ Provedores encontrados: ${providers.length}`);
+          return {
+            success: true,
+            data: providers,
+            message: `${providers.length} provedores encontrados`
+          };
+        }
+      } catch (postError: any) {
+        // Se POST falhar, tentar GET
+        if (postError.response?.status === 405 || postError.response?.status === 404) {
+          const { data } = await client.get("/api/v2/providers", {
+            data: authBody // Algumas APIs aceitam body em GET
+          });
+          
           let providers: PlayFiversProvider[] = [];
-
-          if (Array.isArray(data)) {
-            providers = data;
-          } else if (data.providers && Array.isArray(data.providers)) {
-            providers = data.providers;
-          } else if (data.data && Array.isArray(data.data)) {
+          if (data.data && Array.isArray(data.data)) {
             providers = data.data;
-          } else if (data.result && Array.isArray(data.result)) {
-            providers = data.result;
-          } else if (data.items && Array.isArray(data.items)) {
-            providers = data.items;
-          } else if (data.list && Array.isArray(data.list)) {
-            providers = data.list;
+          } else if (Array.isArray(data)) {
+            providers = data;
           }
 
           if (providers.length > 0) {
             // eslint-disable-next-line no-console
-            console.log(`✅ Provedores encontrados via ${endpoint}: ${providers.length}`);
+            console.log(`✅ Provedores encontrados via GET: ${providers.length}`);
             return {
               success: true,
               data: providers,
               message: `${providers.length} provedores encontrados`
             };
           }
-
-          // Se não encontrou providers mas recebeu resposta, pode ser formato diferente
-          // eslint-disable-next-line no-console
-          console.warn(`⚠️ Endpoint ${endpoint} respondeu mas formato não reconhecido:`, Object.keys(data));
-        } catch (error: any) {
-          lastError = error;
-          
-          // Se for 404, tentar próximo endpoint
-          if (error.response?.status === 404) {
-            continue;
-          }
-
-          // Se for 401/403, credenciais podem estar erradas
-          if (error.response?.status === 401 || error.response?.status === 403) {
-            return {
-              success: false,
-              error: "Credenciais inválidas ou sem permissão",
-              message: `Erro de autenticação ao buscar provedores (status: ${error.response.status})`
-            };
-          }
-
-          // Para outros erros, não tentar mais endpoints
-          break;
+        } else {
+          throw postError;
         }
       }
 
-      const errorMessage = lastError
-        ? `Nenhum endpoint retornou dados. Último erro: ${lastError.message}`
-        : "Nenhum endpoint retornou dados";
-
+      // Se chegou aqui, nenhum método funcionou
       return {
         success: false,
-        error: errorMessage,
+        error: "Não foi possível buscar provedores. Verifique as credenciais.",
         message: "Erro ao buscar provedores"
       };
     } catch (error: any) {
@@ -597,95 +481,60 @@ export const playFiversService = {
 
   /**
    * Configurar callback URL na PlayFivers
+   * Segundo a documentação: PUT /api/v2/agent
+   * Body: { agentToken, secretKey, callback_url }
    */
   async setCallbackUrl(callbackUrl: string): Promise<PlayFiversResponse> {
     try {
       const client = await createClient();
       const creds = await getCredentials();
 
-      // Preparar dados baseado no método de autenticação
-      const requestData: Record<string, unknown> = {
+      // Segundo a documentação: PUT /api/v2/agent para atualizar informações do agente
+      // Inclui callback_url no body junto com agentToken e secretKey
+      const requestData = await addAuthToBody({
         callback_url: callbackUrl,
         webhook_url: callbackUrl // Tentar ambos os nomes
-      };
+      });
 
-      if (creds.authMethod === "agent") {
-        requestData.agent_id = creds.agentId;
-        requestData.agent_secret = creds.agentSecret;
-      }
+      try {
+        // Tentar PUT /api/v2/agent (endpoint oficial)
+        const { data } = await client.put("/api/v2/agent", requestData);
 
-      // Tentar múltiplos endpoints possíveis para configurar callback
-      const endpoints = [
-        "/v1/agent/callback",
-        "/agent/callback",
-        "/v1/callback",
-        "/callback",
-        "/webhook",
-        "/v1/webhook",
-        "/agent/webhook",
-        "/v1/agent/webhook",
-        "/v1/settings/callback",
-        "/settings/callback"
-      ];
+        // eslint-disable-next-line no-console
+        console.log(`✅ Callback URL configurada: ${callbackUrl}`);
 
-      let lastError: Error | null = null;
-      let lastResponse: any = null;
-
-      for (const endpoint of endpoints) {
-        try {
-          // Tentar POST primeiro
-          let response;
-          try {
-            response = await client.post(endpoint, requestData);
-          } catch (postError: any) {
-            // Se POST falhar, tentar PUT
-            if (postError.response?.status === 405) {
-              response = await client.put(endpoint, requestData);
-            } else {
-              throw postError;
-            }
-          }
-
+        return {
+          success: true,
+          data,
+          message: "Callback URL configurada com sucesso"
+        };
+      } catch (putError: any) {
+        // Se PUT falhar, tentar POST
+        if (putError.response?.status === 405 || putError.response?.status === 404) {
+          const { data } = await client.post("/api/v2/agent", requestData);
+          
           // eslint-disable-next-line no-console
-          console.log(`✅ Callback URL configurada via ${endpoint}: ${callbackUrl}`);
-
+          console.log(`✅ Callback URL configurada via POST: ${callbackUrl}`);
+          
           return {
             success: true,
-            data: response.data,
-            message: `Callback URL configurada com sucesso (endpoint: ${endpoint})`
+            data,
+            message: "Callback URL configurada com sucesso"
           };
-        } catch (error: any) {
-          lastError = error;
-          lastResponse = error.response;
-
-          // Se for 404, tentar próximo endpoint
-          if (error.response?.status === 404) {
-            continue;
-          }
-
-          // Se for 401/403, credenciais podem estar erradas
-          if (error.response?.status === 401 || error.response?.status === 403) {
-            return {
-              success: false,
-              error: "Credenciais inválidas ou sem permissão",
-              message: `Erro de autenticação ao configurar callback (status: ${error.response.status})`
-            };
-          }
-
-          // Para outros erros, não tentar mais endpoints
-          break;
         }
+        
+        // Se for 401/403, credenciais podem estar erradas
+        if (putError.response?.status === 401 || putError.response?.status === 403) {
+          return {
+            success: false,
+            error: "Credenciais inválidas ou sem permissão",
+            message: `Erro de autenticação ao configurar callback (status: ${putError.response.status})`
+          };
+        }
+        
+        throw putError;
       }
 
-      const errorMessage = lastResponse
-        ? `Nenhum endpoint aceitou a configuração. Último erro: ${lastResponse.status} - ${lastError?.message}`
-        : `Nenhum endpoint aceitou a configuração. ${lastError?.message || "Erro desconhecido"}`;
-
-      return {
-        success: false,
-        error: errorMessage,
-        message: "Não foi possível configurar a callback URL. Verifique a documentação da PlayFivers ou configure manualmente no painel."
-      };
     } catch (error: any) {
       // eslint-disable-next-line no-console
       console.error("❌ Erro ao configurar callback URL:", error.message);
@@ -700,6 +549,9 @@ export const playFiversService = {
 
   /**
    * Buscar lista de jogos disponíveis na PlayFivers
+   * Endpoint oficial: GET /api/v2/games
+   * Parâmetro opcional: provider_code (query string)
+   * Requer agentToken e secretKey no body
    */
   async getAvailableGames(
     providerId?: string
@@ -708,99 +560,70 @@ export const playFiversService = {
       const client = await createClient();
       const creds = await getCredentials();
 
-      // Construir parâmetros
+      // Segundo a documentação: GET /api/v2/games?provider_code=XXX
+      // Autenticação via body (agentToken + secretKey)
+      const authBody = await addAuthToBody({});
+      
+      // Construir query params
       const params: Record<string, string> = {};
       if (providerId) {
-        params.provider_id = providerId;
-        params.providerId = providerId; // Tentar ambos os formatos
+        params.provider_code = providerId; // Segundo a documentação, é provider_code
       }
 
-      // Se usar autenticação agent, pode precisar incluir no params
-      const requestConfig: any = { params };
+      try {
+        // Tentar POST primeiro (conforme documentação pode requerer body)
+        const { data } = await client.post("/api/v2/games", authBody, { params });
+        
+        // Normalizar resposta
+        let games: PlayFiversGame[] = [];
+        if (data.data && Array.isArray(data.data)) {
+          games = data.data;
+        } else if (Array.isArray(data)) {
+          games = data;
+        }
 
-      if (creds.authMethod === "agent") {
-        requestConfig.params = {
-          ...requestConfig.params,
-          agent_id: creds.agentId,
-          agent_secret: creds.agentSecret
-        };
-      }
-
-      // Tentar múltiplos endpoints possíveis
-      const endpoints = [
-        "/v1/games",
-        "/games",
-        "/agent/games",
-        "/api/v1/games",
-        "/casino/games",
-        "/v1/casino/games"
-      ];
-
-      let lastError: Error | null = null;
-
-      for (const endpoint of endpoints) {
-        try {
-          const { data } = await client.get(endpoint, requestConfig);
-
-          // Normalizar resposta (pode vir em diferentes formatos)
+        if (games.length > 0 || data) {
+          // eslint-disable-next-line no-console
+          console.log(`✅ Jogos encontrados: ${games.length}`);
+          return {
+            success: true,
+            data: games,
+            message: `${games.length} jogos encontrados`
+          };
+        }
+      } catch (postError: any) {
+        // Se POST falhar, tentar GET
+        if (postError.response?.status === 405 || postError.response?.status === 404) {
+          const { data } = await client.get("/api/v2/games", {
+            params,
+            data: authBody // Algumas APIs aceitam body em GET
+          });
+          
           let games: PlayFiversGame[] = [];
-
-          if (Array.isArray(data)) {
-            games = data;
-          } else if (data.games && Array.isArray(data.games)) {
-            games = data.games;
-          } else if (data.data && Array.isArray(data.data)) {
+          if (data.data && Array.isArray(data.data)) {
             games = data.data;
-          } else if (data.result && Array.isArray(data.result)) {
-            games = data.result;
-          } else if (data.items && Array.isArray(data.items)) {
-            games = data.items;
-          } else if (data.list && Array.isArray(data.list)) {
-            games = data.list;
+          } else if (Array.isArray(data)) {
+            games = data;
           }
 
           if (games.length > 0 || data) {
             // eslint-disable-next-line no-console
-            console.log(`✅ Jogos encontrados via ${endpoint}: ${games.length}`);
+            console.log(`✅ Jogos encontrados via GET: ${games.length}`);
             return {
               success: true,
               data: games,
               message: `${games.length} jogos encontrados`
             };
           }
-
-          // Se não encontrou games mas recebeu resposta, pode ser formato diferente
-          // eslint-disable-next-line no-console
-          console.warn(`⚠️ Endpoint ${endpoint} respondeu mas formato não reconhecido:`, Object.keys(data));
-        } catch (error: any) {
-          lastError = error;
-          
-          // Se for 404, tentar próximo endpoint
-          if (error.response?.status === 404) {
-            continue;
-          }
-
-          // Se for 401/403, credenciais podem estar erradas
-          if (error.response?.status === 401 || error.response?.status === 403) {
-            return {
-              success: false,
-              error: "Credenciais inválidas ou sem permissão",
-              message: `Erro de autenticação ao buscar jogos (status: ${error.response.status})`
-            };
-          }
-
-          // Para outros erros, não tentar mais endpoints
-          break;
+        } else {
+          throw postError;
         }
       }
 
-      const errorMessage = lastError
-        ? `Nenhum endpoint retornou dados. Último erro: ${lastError.message}`
-        : "Nenhum endpoint retornou dados";
-
+      // Se chegou aqui, nenhum método funcionou
       return {
         success: false,
-        error: errorMessage,
+        error: "Não foi possível buscar jogos. Verifique as credenciais.",
         message: "Erro ao buscar jogos"
       };
     } catch (error: any) {

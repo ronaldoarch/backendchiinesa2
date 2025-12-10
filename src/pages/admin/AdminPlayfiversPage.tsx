@@ -47,7 +47,7 @@ export function AdminPlayfiversPage() {
     "playfivers.agentId": "",
     "playfivers.secret": "",
     "playfivers.token": "",
-    "playfivers.authMethod": "bearer"
+    "playfivers.authMethod": "agent"
   });
 
   // Estados para busca e importação
@@ -413,7 +413,7 @@ export function AdminPlayfiversPage() {
           <label>
             <span>Método de Autenticação</span>
             <select
-              value={settingsForm["playfivers.authMethod"] ?? "bearer"}
+              value={settingsForm["playfivers.authMethod"] ?? "agent"}
               onChange={(e) =>
                 setSettingsForm((s) => ({
                   ...s,
@@ -421,9 +421,9 @@ export function AdminPlayfiversPage() {
                 }))
               }
             >
-              <option value="bearer">Bearer Token (padrão)</option>
+              <option value="agent">Agent (agentToken + secretKey no body) - Padrão PlayFivers</option>
+              <option value="bearer">Bearer Token (Authorization header)</option>
               <option value="api_key">API Key (X-API-Key header)</option>
-              <option value="agent">Agent (agent_id + agent_secret no body)</option>
               <option value="basic">Basic Auth</option>
             </select>
           </label>

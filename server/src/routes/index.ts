@@ -23,27 +23,57 @@ apiRouter.post("/playfivers/callback", (req, res) => {
     timestamp: new Date().toISOString()
   });
 
-  // Validar assinatura se necessário (implementar conforme documentação)
-  // const signature = req.headers['x-playfivers-signature'];
-  // if (signature && !validateSignature(req.body, signature)) {
-  //   return res.status(401).json({ error: "Assinatura inválida" });
-  // }
+  // Segundo a documentação, os webhooks podem ser:
+  // - POST /webhook (Webhook - Saldo): type: "BALANCE", user_code, retorna balance
+  // - POST /api/webhook (Webhook - Transação): type: "WinBet", agent_code, agent_secret, user_code, user_balance, game_original, game_type, slot, retorna balance
 
-  // Processar diferentes tipos de eventos
-  const eventType = req.body.type || req.body.event || req.body.event_type;
-  const eventData = req.body.data || req.body;
+  const eventType = req.body.type;
+  const userCode = req.body.user_code;
+  const agentCode = req.body.agent_code;
+  const userBalance = req.body.user_balance;
 
   // eslint-disable-next-line no-console
-  console.log(`📋 Tipo de evento: ${eventType || "desconhecido"}`);
+  console.log(`📋 Tipo de evento: ${eventType || "desconhecido"}`, {
+    user_code: userCode,
+    agent_code: agentCode,
+    user_balance: userBalance
+  });
 
-  // Aqui você pode processar diferentes tipos de eventos:
-  // - bet_placed: Aposta realizada
-  // - bet_settled: Aposta finalizada
-  // - balance_update: Atualização de saldo
-  // - game_session: Sessão de jogo
-  // etc.
+  // Processar diferentes tipos de webhooks
+  if (eventType === "BALANCE") {
+    // Webhook de saldo - retornar saldo atualizado
+    // eslint-disable-next-line no-console
+    console.log("💰 Webhook de saldo recebido para usuário:", userCode);
+    
+    // TODO: Buscar saldo atual do usuário no banco
+    // Por enquanto, retornar o saldo recebido ou buscar do banco
+    res.status(200).json({ 
+      msg: "",
+      balance: userBalance || 0 // Retornar saldo atualizado
+    });
+    return;
+  }
 
-  // Por enquanto, apenas logar e responder OK
+  if (eventType === "WinBet" || eventType === "LoseBet" || eventType === "Bet") {
+    // Webhook de transação - processar aposta
+    // eslint-disable-next-line no-console
+    console.log("🎰 Webhook de transação recebido:", {
+      type: eventType,
+      user_code: userCode,
+      game_type: req.body.game_type,
+      slot: req.body.slot
+    });
+    
+    // TODO: Processar transação, atualizar saldo no banco
+    // Por enquanto, retornar saldo atualizado
+    res.status(200).json({ 
+      msg: "",
+      balance: userBalance || 0 // Retornar saldo atualizado após a transação
+    });
+    return;
+  }
+
+  // Webhook desconhecido - apenas logar e responder OK
   res.status(200).json({ 
     ok: true, 
     received: true,
