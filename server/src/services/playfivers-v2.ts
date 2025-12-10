@@ -701,8 +701,17 @@ export const playFiversService = {
       }
 
       try {
-        // Tentar POST primeiro (conforme documentação pode requerer body)
-        const { data } = await client.post("/api/v2/games", authBody, { params });
+        // A API PlayFivers só aceita GET para /api/v2/games (não aceita POST)
+        // Usar GET diretamente com body
+        const { data } = await client.request({
+          method: "GET",
+          url: "/api/v2/games",
+          params,
+          data: authBody, // Enviar body mesmo em GET
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
         
         // Normalizar resposta
         let games: PlayFiversGame[] = [];
@@ -714,40 +723,43 @@ export const playFiversService = {
 
         if (games.length > 0 || data) {
           // eslint-disable-next-line no-console
-          console.log(`✅ Jogos encontrados: ${games.length}`);
+          console.log(`✅ Jogos encontrados via GET: ${games.length}`);
           return {
             success: true,
             data: games,
             message: `${games.length} jogos encontrados`
           };
         }
-      } catch (postError: any) {
-        // Se POST falhar, tentar GET
-        if (postError.response?.status === 405 || postError.response?.status === 404) {
-          const { data } = await client.get("/api/v2/games", {
-            params,
-            data: authBody // Algumas APIs aceitam body em GET
-          });
-          
-          let games: PlayFiversGame[] = [];
-          if (data.data && Array.isArray(data.data)) {
-            games = data.data;
-          } else if (Array.isArray(data)) {
-            games = data;
-          }
-
-          if (games.length > 0 || data) {
-            // eslint-disable-next-line no-console
-            console.log(`✅ Jogos encontrados via GET: ${games.length}`);
+      } catch (error: any) {
+        // Se for 401/403, credenciais podem estar erradas
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          const errorMsg = error.response?.data?.msg || error.response?.data?.message || "";
+          if (errorMsg.includes("IP") || errorMsg.includes("ip") || errorMsg.includes("permitido")) {
             return {
-              success: true,
-              data: games,
-              message: `${games.length} jogos encontrados`
+              success: false,
+              error: "IP não autorizado",
+              message: `A API PlayFivers rejeitou a requisição: ${errorMsg}. Você precisa adicionar o IP do servidor na whitelist da PlayFivers.`
             };
           }
-        } else {
-          throw postError;
+          return {
+            success: false,
+            error: "Credenciais inválidas ou sem permissão",
+            message: `Erro de autenticação (${error.response.status}). Verifique agentToken e secretKey.`
+          };
         }
+        
+        // Tratamento específico para 422
+        if (error.response?.status === 422) {
+          const errorData = error.response?.data || {};
+          const errorMsg = errorData.message || errorData.error || "Dados inválidos";
+          return {
+            success: false,
+            error: `Erro de validação (422): ${errorMsg}`,
+            message: `A API PlayFivers rejeitou a requisição. Verifique se as credenciais estão corretas. Detalhes: ${JSON.stringify(errorData)}`
+          };
+        }
+        
+        throw error;
       }
 
       // Se chegou aqui, nenhum método funcionou

@@ -682,6 +682,9 @@ export function AdminPlayfiversPage() {
         {playfiversGames.length > 0 && (
           <div style={{ marginBottom: "20px" }}>
             <h3>Jogos encontrados ({playfiversGames.length})</h3>
+            <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "10px" }}>
+              {playfiversGames.length > 100 && "⚠️ Muitos jogos encontrados. Mostrando apenas os primeiros 100 para melhor performance."}
+            </p>
             <div
               style={{
                 maxHeight: "400px",
@@ -691,7 +694,7 @@ export function AdminPlayfiversPage() {
                 padding: "10px"
               }}
             >
-              {playfiversGames.map((pfGame, idx) => {
+              {playfiversGames.slice(0, 100).map((pfGame, idx) => {
                 const gameId = pfGame.game_id || pfGame.id || "";
                 const name = pfGame.name || pfGame.title || "";
                 const providerId = pfGame.provider_id || pfGame.provider || "";
