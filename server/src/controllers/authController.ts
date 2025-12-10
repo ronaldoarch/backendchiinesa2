@@ -23,16 +23,16 @@ const loginSchema = z.object({
 export async function registerController(req: Request, res: Response): Promise<void> {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: "Dados inválidos", details: parsed.error.flatten() });
+    res.status(400).json({ error: "Dados inv?lidos", details: parsed.error.flatten() });
     return;
   }
 
   const { username, password, phone, currency } = parsed.data;
 
-  // Verificar se usuário já existe
+  // Verificar se usu?rio j? existe
   const existingUser = await findUserByUsername(username);
   if (existingUser) {
-    res.status(400).json({ error: "Nome de usuário já está em uso" });
+    res.status(400).json({ error: "Nome de usu?rio j? est? em uso" });
     return;
   }
 
@@ -52,8 +52,8 @@ export async function registerController(req: Request, res: Response): Promise<v
     });
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error("Erro ao criar usuário:", error);
-    res.status(500).json({ error: "Erro ao criar usuário" });
+    console.error("Erro ao criar usu?rio:", error);
+    res.status(500).json({ error: "Erro ao criar usu?rio" });
   }
 }
 
@@ -65,8 +65,8 @@ export async function loginController(req: Request, res: Response): Promise<void
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
       // eslint-disable-next-line no-console
-      console.log("Login: Dados inválidos", parsed.error.flatten());
-      res.status(400).json({ error: "Dados inválidos", details: parsed.error.flatten() });
+      console.log("Login: Dados inv?lidos", parsed.error.flatten());
+      res.status(400).json({ error: "Dados inv?lidos", details: parsed.error.flatten() });
       return;
     }
 
@@ -75,16 +75,36 @@ export async function loginController(req: Request, res: Response): Promise<void
     const user = await findUserByUsername(username);
     if (!user) {
       // eslint-disable-next-line no-console
-      console.log("Login: Usuário não encontrado", username);
-      res.status(401).json({ error: "Credenciais inválidas" });
+      console.log("Login: Usu?rio n?o encontrado", username);
+      res.status(401).json({ error: "Credenciais inv?lidas" });
       return;
     }
 
+    // eslint-disable-next-line no-console
+    console.log("Login: Usu?rio encontrado", {
+      id: user.id,
+      username: user.username,
+      has_password_hash: !!user.password_hash,
+      password_hash_length: user.password_hash?.length,
+      password_hash_start: user.password_hash?.substring(0, 10) + "..."
+    });
+
     const isValidPassword = await verifyPassword(password, user.password_hash);
+    // eslint-disable-next-line no-console
+    console.log("Login: Verifica??o de senha", {
+      username,
+      password_provided_length: password.length,
+      isValidPassword,
+      hash_starts_with: user.password_hash?.substring(0, 7)
+    });
+    
     if (!isValidPassword) {
       // eslint-disable-next-line no-console
-      console.log("Login: Senha inválida para usuário", username);
-      res.status(401).json({ error: "Credenciais inválidas" });
+      console.log("Login: Senha inv?lida para usu?rio", username, {
+        password_length: password.length,
+        hash_exists: !!user.password_hash
+      });
+      res.status(401).json({ error: "Credenciais inv?lidas" });
       return;
     }
 
@@ -120,13 +140,13 @@ export async function meController(req: Request, res: Response): Promise<void> {
   const userId = (req as any).userId;
   
   if (!userId) {
-    res.status(401).json({ error: "Não autenticado" });
+    res.status(401).json({ error: "N?o autenticado" });
     return;
   }
 
   const user = await findUserById(userId);
   if (!user) {
-    res.status(404).json({ error: "Usuário não encontrado" });
+    res.status(404).json({ error: "Usu?rio n?o encontrado" });
     return;
   }
 
