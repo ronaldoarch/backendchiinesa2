@@ -9,15 +9,47 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { SideMenu } from "./components/SideMenu";
 import { AuthModal } from "./components/AuthModal";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { getUser, removeAuthToken, api } from "./services/api";
+import { getUser, removeAuthToken, setUser as saveUserToStorage, api } from "./services/api";
 
 export function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState<{ username: string; id: number; is_admin: boolean } | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("register");
   const [loading, setLoading] = useState(true);
   const location = useLocation();
   const isAdmin = location.pathname.startsWith("/admin");
+
+  // Atualizar usuário quando a rota mudar (para verificar admin)
+  useEffect(() => {
+    if (location.pathname.startsWith("/admin")) {
+      const savedUser = getUser();
+      const token = localStorage.getItem("token");
+      if (token && savedUser) {
+        // Verificar novamente se é admin ao acessar rota admin
+        api.get("/auth/me")
+          .then((response) => {
+            // Garantir que is_admin seja boolean
+            const updatedUser = {
+              ...response.data,
+              is_admin: Boolean(
+                response.data.is_admin === true || 
+                response.data.is_admin === 1 || 
+                response.data.is_admin === "true" ||
+                response.data.is_admin === "1"
+              )
+            };
+            // Atualizar estado e localStorage
+            setUser(updatedUser);
+            saveUserToStorage(updatedUser);
+          })
+          .catch(() => {
+            removeAuthToken();
+            setUser(null);
+          });
+      }
+    }
+  }, [location.pathname]);
 
   // Verificar autenticação ao carregar
   useEffect(() => {
@@ -25,12 +57,31 @@ export function App() {
       const savedUser = getUser();
       const token = localStorage.getItem("token");
 
+      // eslint-disable-next-line no-console
+      console.log("Verificando autenticação:", { token: !!token, savedUser });
+
       if (token && savedUser) {
         try {
-          // Verificar se o token ainda é válido
+          // Verificar se o token ainda é válido e obter dados atualizados do banco
           const response = await api.get("/auth/me");
-          setUser(response.data);
-        } catch {
+          // eslint-disable-next-line no-console
+          console.log("Token válido, usuário:", response.data);
+          // Garantir que is_admin seja boolean
+          const updatedUser = {
+            ...response.data,
+            is_admin: Boolean(
+              response.data.is_admin === true || 
+              response.data.is_admin === 1 || 
+              response.data.is_admin === "true" ||
+              response.data.is_admin === "1"
+            )
+          };
+          // Atualizar estado e localStorage
+          setUser(updatedUser);
+          saveUserToStorage(updatedUser);
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error("Token inválido:", error);
           // Token inválido, limpar
           removeAuthToken();
           setUser(null);
@@ -43,6 +94,20 @@ export function App() {
 
     checkAuth();
   }, []);
+
+  // Verificar autenticação quando authOpen mudar (após login/logout)
+  useEffect(() => {
+    if (!authOpen) {
+      // Quando o modal fecha, verificar novamente o estado
+      const savedUser = getUser();
+      const token = localStorage.getItem("token");
+      if (token && savedUser) {
+        setUser(savedUser);
+      } else {
+        setUser(null);
+      }
+    }
+  }, [authOpen]);
 
   return (
     <div className={`app-root${isAdmin ? " app-root-admin" : ""}`}>
@@ -58,11 +123,14 @@ export function App() {
           <span className="logo-text">BIGBET777</span>
         </div>
         <div className="top-bar-right">
-          {user ? (
+          {user && user.username ? (
             <>
               <span className="user-pill">Olá, {user.username}</span>
-              {user.is_admin && (
-                <NavLink to="/admin" className="btn btn-ghost">
+              {(user.is_admin === true || user.is_admin === "true" || user.is_admin === 1 || user.is_admin === "1") && (
+                <NavLink 
+                  to="/admin" 
+                  className="btn btn-ghost"
+                >
                   Admin
                 </NavLink>
               )}
@@ -83,13 +151,19 @@ export function App() {
             <>
               <button
                 className="btn btn-ghost"
-                onClick={() => setAuthOpen(true)}
+                onClick={() => {
+                  setAuthMode("login");
+                  setAuthOpen(true);
+                }}
               >
                 Login
               </button>
               <button
                 className="btn btn-gold"
-                onClick={() => setAuthOpen(true)}
+                onClick={() => {
+                  setAuthMode("register");
+                  setAuthOpen(true);
+                }}
               >
                 Registro
               </button>
@@ -103,8 +177,28 @@ export function App() {
       )}
       <AuthModal
         open={authOpen}
-        onClose={() => setAuthOpen(false)}
-        onSuccess={(newUser) => setUser(newUser)}
+        onClose={() => {
+          setAuthOpen(false);
+          // Verificar novamente após fechar o modal
+          setTimeout(() => {
+            const savedUser = getUser();
+            const token = localStorage.getItem("token");
+            if (token && savedUser) {
+              setUser(savedUser);
+            }
+          }, 100);
+        }}
+        onSuccess={(newUser) => {
+          // eslint-disable-next-line no-console
+          console.log("onSuccess chamado com usuário:", newUser);
+          // Atualizar estado imediatamente
+          setUser(newUser);
+          // Verificar se foi salvo corretamente
+          const savedUser = getUser();
+          // eslint-disable-next-line no-console
+          console.log("Estado atualizado, usuário no localStorage:", savedUser);
+        }}
+        initialMode={authMode}
       />
 
       <main className="app-main">

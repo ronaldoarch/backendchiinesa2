@@ -37,7 +37,12 @@ export async function createUser(
     [insertResult.insertId]
   );
 
-  return rows[0] as User;
+  const row = rows[0];
+  // Garantir que is_admin seja boolean (MySQL pode retornar 0/1)
+  return {
+    ...row,
+    is_admin: Boolean(row.is_admin === 1 || row.is_admin === true)
+  } as User;
 }
 
 export async function findUserByUsername(username: string): Promise<UserWithPassword | null> {
@@ -50,7 +55,12 @@ export async function findUserByUsername(username: string): Promise<UserWithPass
     return null;
   }
 
-  return rows[0] as UserWithPassword;
+  const row = rows[0];
+  // Garantir que is_admin seja boolean (MySQL pode retornar 0/1)
+  return {
+    ...row,
+    is_admin: Boolean(row.is_admin === 1 || row.is_admin === true)
+  } as UserWithPassword;
 }
 
 export async function findUserById(id: number): Promise<User | null> {
@@ -63,7 +73,12 @@ export async function findUserById(id: number): Promise<User | null> {
     return null;
   }
 
-  return rows[0] as User;
+  const row = rows[0];
+  // Garantir que is_admin seja boolean (MySQL pode retornar 0/1)
+  return {
+    ...row,
+    is_admin: Boolean(row.is_admin === 1 || row.is_admin === true)
+  } as User;
 }
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {

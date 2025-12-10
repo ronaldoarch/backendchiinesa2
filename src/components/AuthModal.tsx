@@ -1,14 +1,25 @@
-import { useState } from "react";
-import { api, setAuthToken, setUser } from "../services/api";
+import { useState, useEffect } from "react";
+import { api, setAuthToken, setUser, getUser } from "../services/api";
 
 type Props = {
   open: boolean;
   onClose: () => void;
   onSuccess: (user: { username: string; id: number; is_admin: boolean }) => void;
+  initialMode?: "login" | "register";
 };
 
-export function AuthModal({ open, onClose, onSuccess }: Props) {
-  const [mode, setMode] = useState<"login" | "register">("register");
+export function AuthModal({ open, onClose, onSuccess, initialMode = "register" }: Props) {
+  const [mode, setMode] = useState<"login" | "register">(initialMode);
+  
+  // Atualizar modo quando initialMode mudar
+  useEffect(() => {
+    if (open) {
+      setMode(initialMode);
+      setError("");
+      setPassword("");
+      setConfirmPassword("");
+    }
+  }, [open, initialMode]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -59,17 +70,33 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
         currency
       });
 
+      // eslint-disable-next-line no-console
+      console.log("Registro bem-sucedido:", response.data);
+
       setAuthToken(response.data.token);
       setUser(response.data.user);
+      
+      // Garantir que foi salvo
+      const savedUser = getUser();
+      // eslint-disable-next-line no-console
+      console.log("Usuário salvo no localStorage:", savedUser);
+      
       onSuccess(response.data.user);
-      onClose();
+      
       // Limpar formulário
       setUsername("");
       setPassword("");
       setConfirmPassword("");
       setPhone("");
       setAccepted(false);
+      
+      // Fechar modal após um pequeno delay
+      setTimeout(() => {
+        onClose();
+      }, 100);
     } catch (err: any) {
+      // eslint-disable-next-line no-console
+      console.error("Erro no registro:", err);
       setError(err.response?.data?.error || "Erro ao criar conta. Tente novamente.");
     } finally {
       setLoading(false);
@@ -87,20 +114,84 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
     setLoading(true);
 
     try {
+      // eslint-disable-next-line no-console
+      console.log("Tentando fazer login com:", { username });
+      
       const response = await api.post("/auth/login", {
         username,
         password
       });
 
+      // eslint-disable-next-line no-console
+      console.log("Login bem-sucedido:", response.data);
+      // eslint-disable-next-line no-console
+      console.log("Response completa:", response);
+
+      // Verificar se a resposta tem os dados esperados
+      if (!response.data || !response.data.token || !response.data.user) {
+        // eslint-disable-next-line no-console
+        console.error("Resposta inválida do servidor:", response.data);
+        setError("Resposta inválida do servidor. Tente novamente.");
+        setLoading(false);
+        return;
+      }
+
+      // Salvar token e usuário
       setAuthToken(response.data.token);
       setUser(response.data.user);
+      
+      // Verificar se foi salvo corretamente
+      const savedToken = localStorage.getItem("token");
+      const savedUser = getUser();
+      // eslint-disable-next-line no-console
+      console.log("Token salvo:", !!savedToken, savedToken ? "SIM" : "NÃO");
+      // eslint-disable-next-line no-console
+      console.log("Usuário salvo no localStorage:", savedUser);
+      
+      if (!savedToken || !savedUser) {
+        // eslint-disable-next-line no-console
+        console.error("Erro ao salvar token/usuário no localStorage");
+        setError("Erro ao salvar dados de autenticação. Tente novamente.");
+        setLoading(false);
+        return;
+      }
+      
+      // Chamar onSuccess ANTES de fechar
       onSuccess(response.data.user);
-      onClose();
+      
       // Limpar formulário
       setUsername("");
       setPassword("");
+      
+      // Fechar modal após um pequeno delay
+      setTimeout(() => {
+        onClose();
+      }, 100);
     } catch (err: any) {
-      setError(err.response?.data?.error || "Credenciais inválidas. Tente novamente.");
+      // eslint-disable-next-line no-console
+      console.error("Erro no login:", err);
+      // eslint-disable-next-line no-console
+      console.error("Detalhes do erro:", {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        code: err.code
+      });
+      
+      if (err.response) {
+        // Erro com resposta do servidor
+        const errorMsg = err.response?.data?.error || `Erro ${err.response?.status}: ${err.response?.statusText || "Erro ao fazer login"}`;
+        setError(errorMsg);
+      } else if (err.request) {
+        // Erro de rede (sem resposta)
+        // eslint-disable-next-line no-console
+        console.error("Erro de rede - sem resposta do servidor:", err.request);
+        setError("Erro de conexão. Verifique se o servidor está online e se há problemas de CORS.");
+      } else {
+        // Outro erro
+        setError(err.message || "Erro ao fazer login. Tente novamente.");
+      }
     } finally {
       setLoading(false);
     }
@@ -138,8 +229,9 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Escolha seu usuário"
+              placeholder={mode === "login" ? "Digite seu usuário" : "Escolha seu usuário"}
               required
+              autoComplete={mode === "login" ? "username" : "off"}
             />
           </label>
 
@@ -151,6 +243,7 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
               onChange={(e) => setPassword(e.target.value)}
               placeholder={mode === "login" ? "Digite sua senha" : "Crie uma senha forte"}
               required
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
             />
           </label>
 
