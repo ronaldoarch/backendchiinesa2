@@ -58,38 +58,57 @@ export async function registerController(req: Request, res: Response): Promise<v
 }
 
 export async function loginController(req: Request, res: Response): Promise<void> {
-  const parsed = loginSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Dados inválidos", details: parsed.error.flatten() });
-    return;
+  try {
+    // eslint-disable-next-line no-console
+    console.log("Login attempt:", { username: req.body?.username });
+    
+    const parsed = loginSchema.safeParse(req.body);
+    if (!parsed.success) {
+      // eslint-disable-next-line no-console
+      console.log("Login: Dados inválidos", parsed.error.flatten());
+      res.status(400).json({ error: "Dados inválidos", details: parsed.error.flatten() });
+      return;
+    }
+
+    const { username, password } = parsed.data;
+
+    const user = await findUserByUsername(username);
+    if (!user) {
+      // eslint-disable-next-line no-console
+      console.log("Login: Usuário não encontrado", username);
+      res.status(401).json({ error: "Credenciais inválidas" });
+      return;
+    }
+
+    const isValidPassword = await verifyPassword(password, user.password_hash);
+    if (!isValidPassword) {
+      // eslint-disable-next-line no-console
+      console.log("Login: Senha inválida para usuário", username);
+      res.status(401).json({ error: "Credenciais inválidas" });
+      return;
+    }
+
+    const token = generateToken(user);
+
+    const responseData = {
+      user: {
+        id: user.id,
+        username: user.username,
+        phone: user.phone,
+        currency: user.currency,
+        is_admin: user.is_admin
+      },
+      token
+    };
+
+    // eslint-disable-next-line no-console
+    console.log("Login: Sucesso para usuário", username, "is_admin:", user.is_admin);
+    res.json(responseData);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error("Login: Erro inesperado", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
   }
-
-  const { username, password } = parsed.data;
-
-  const user = await findUserByUsername(username);
-  if (!user) {
-    res.status(401).json({ error: "Credenciais inválidas" });
-    return;
-  }
-
-  const isValidPassword = await verifyPassword(password, user.password_hash);
-  if (!isValidPassword) {
-    res.status(401).json({ error: "Credenciais inválidas" });
-    return;
-  }
-
-  const token = generateToken(user);
-
-  res.json({
-    user: {
-      id: user.id,
-      username: user.username,
-      phone: user.phone,
-      currency: user.currency,
-      is_admin: user.is_admin
-    },
-    token
-  });
 }
 
 export async function meController(req: Request, res: Response): Promise<void> {
