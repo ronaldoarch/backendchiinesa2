@@ -241,8 +241,9 @@ export function AdminPlayfiversPage() {
 
   async function handleImportGame(game: PlayFiversGame, localProviderId: number) {
     try {
-      const gameId = game.game_id || game.id || "";
-      const name = game.name || game.title || "";
+      // Garantir que todos os valores sejam strings (não objetos)
+      const gameId = String(game.game_id || game.id || "").trim();
+      const name = String(game.name || game.title || "").trim();
 
       if (!name || !gameId) {
         showMessage("error", "Dados do jogo incompletos");
@@ -294,21 +295,22 @@ export function AdminPlayfiversPage() {
       // Filtrar e validar jogos antes de enviar
       const gamesToImport = playfiversGames
         .map((game) => {
-          const gameId = game.game_id || game.id || "";
-          const name = game.name || game.title || "";
+          // Garantir que todos os valores sejam strings (não objetos)
+          const gameId = String(game.game_id || game.id || "").trim();
+          const name = String(game.name || game.title || "").trim();
           
           // Validar dados
-          if (!name || !gameId) {
+          if (!name || !gameId || gameId === "undefined" || name === "undefined") {
             return null;
           }
 
           return {
             providerId: Number(localProvider.id!),
-            name: String(name).trim(),
-            externalId: String(gameId).trim()
+            name: name,
+            externalId: gameId
           };
         })
-        .filter((g): g is { providerId: number; name: string; externalId: string } => g !== null);
+        .filter((g): g is { providerId: number; name: string; externalId: string } => g !== null && g.name !== "" && g.externalId !== "");
 
       if (gamesToImport.length === 0) {
         showMessage("error", "Nenhum jogo válido para importar. Verifique se os jogos têm nome e ID.");
@@ -733,21 +735,27 @@ export function AdminPlayfiversPage() {
               }}
             >
               {playfiversGames.slice(0, 100).map((pfGame, idx) => {
-                const gameId = pfGame.game_id || pfGame.id || "";
-                const name = pfGame.name || pfGame.title || "";
-                const providerId = pfGame.provider_id || pfGame.provider || "";
+                // Garantir que todos os valores sejam strings (não objetos)
+                const gameId = String(pfGame.game_id || pfGame.id || "").trim();
+                const name = String(pfGame.name || pfGame.title || "").trim();
+                const providerId = String(pfGame.provider_id || pfGame.provider || "").trim();
                 const localProvider = providers.find((p) => p.externalId === providerId);
                 const alreadyImported = localProvider
                   ? games.some(
                       (g) =>
-                        g.externalId === gameId &&
+                        String(g.externalId || "").trim() === gameId &&
                         g.providerId === localProvider.id
                     )
                   : false;
 
+                // Validar que temos dados válidos antes de renderizar
+                if (!gameId || !name) {
+                  return null;
+                }
+
                 return (
                   <div
-                    key={idx}
+                    key={`${gameId}-${idx}`}
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
@@ -759,10 +767,10 @@ export function AdminPlayfiversPage() {
                     }}
                   >
                     <div>
-                      <strong>{name}</strong>
+                      <strong>{name || "Sem nome"}</strong>
                       <br />
                       <small style={{ color: "#9b9bb2" }}>
-                        ID: {gameId} | Provider: {providerId}
+                        ID: {gameId || "N/A"} | Provider: {providerId || "N/A"}
                       </small>
                     </div>
                     {localProvider && (
