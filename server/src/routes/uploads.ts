@@ -7,11 +7,17 @@ import { asyncHandler } from "../middleware/asyncHandler";
 
 export const uploadsRouter = Router();
 
+// IMPORTANTE: Usar o mesmo caminho que server.ts usa para servir arquivos
 const uploadDir = path.resolve(__dirname, "..", "..", "server", "uploads");
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
+  console.log("✅ [UPLOADS ROUTE] Diretório de uploads criado:", uploadDir);
 }
+
+console.log("📁 [UPLOADS ROUTE] Diretório configurado:", uploadDir);
+console.log("📁 [UPLOADS ROUTE] __dirname:", __dirname);
+console.log("📁 [UPLOADS ROUTE] Diretório existe?", fs.existsSync(uploadDir));
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {

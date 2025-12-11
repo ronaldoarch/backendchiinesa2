@@ -40,14 +40,70 @@ app.use(json());
 app.use(requestLogger);
 
 // Criar diretório de uploads se não existir
+// IMPORTANTE: Usar o mesmo caminho que routes/uploads.ts usa para salvar arquivos
+const fs = require("fs");
 const uploadsDir = path.resolve(__dirname, "..", "..", "server", "uploads");
+
 try {
-  if (!require("fs").existsSync(uploadsDir)) {
-    require("fs").mkdirSync(uploadsDir, { recursive: true });
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log("✅ Diretório de uploads criado:", uploadsDir);
   }
-  app.use("/uploads", express.static(uploadsDir));
+  
+  // Log para debug
+  console.log("📁 [SERVER] Diretório de uploads configurado:", uploadsDir);
+  console.log("📁 [SERVER] __dirname:", __dirname);
+  console.log("📁 [SERVER] Diretório existe?", fs.existsSync(uploadsDir));
+  
+  // Listar arquivos no diretório se existir
+  if (fs.existsSync(uploadsDir)) {
+    try {
+      const files = fs.readdirSync(uploadsDir);
+      console.log("📂 [SERVER] Arquivos no diretório:", files.length, "arquivo(s)");
+      if (files.length > 0) {
+        console.log("📂 [SERVER] Primeiros arquivos:", files.slice(0, 5));
+      }
+    } catch (err) {
+      console.error("❌ [SERVER] Erro ao listar arquivos:", err);
+    }
+  }
+  
+  // Servir arquivos estáticos de uploads ANTES da rota catch-all
+  app.use("/uploads", express.static(uploadsDir, {
+    setHeaders: (res) => {
+      res.set("Cache-Control", "public, max-age=31536000");
+    }
+  }));
+  
+  // Middleware para tratar arquivos não encontrados em /uploads (após express.static)
+  app.use("/uploads", (req, res) => {
+    const requestedFile = req.path.replace("/uploads/", "");
+    const filePath = path.join(uploadsDir, requestedFile);
+    
+    console.log("⚠️ [404] Arquivo não encontrado:", req.path);
+    console.log("⚠️ [404] Caminho completo procurado:", filePath);
+    console.log("⚠️ [404] Diretório base:", uploadsDir);
+    console.log("⚠️ [404] Arquivo existe?", fs.existsSync(filePath));
+    
+    // Listar arquivos no diretório para debug
+    try {
+      if (fs.existsSync(uploadsDir)) {
+        const files = fs.readdirSync(uploadsDir);
+        console.log("📂 [404] Total de arquivos no diretório:", files.length);
+        console.log("📂 [404] Arquivos:", files);
+        console.log("📂 [404] Arquivo procurado está na lista?", files.includes(requestedFile));
+      } else {
+        console.log("❌ [404] Diretório não existe!");
+      }
+    } catch (err) {
+      console.log("❌ [404] Erro ao listar arquivos:", err);
+    }
+    
+    res.status(404).json({ error: "Arquivo não encontrado" });
+  });
+  
+  console.log("✅ Rota /uploads configurada para servir arquivos de:", uploadsDir);
 } catch (error) {
-  // eslint-disable-next-line no-console
   console.warn("⚠️ Aviso: Não foi possível configurar diretório de uploads:", error);
 }
 
