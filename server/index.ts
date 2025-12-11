@@ -22,12 +22,24 @@ app.use(
 app.use(json());
 
 // Criar diretório de uploads se não existir
-const uploadsDir = path.resolve(__dirname, "uploads");
+// IMPORTANTE: Usar o mesmo caminho que routes/uploads.ts usa para salvar arquivos
+// Caminho relativo ao diretório raiz do projeto (server/uploads)
+// Se compilado: __dirname = dist-server, então .. = raiz, server/uploads
+// Se não compilado: __dirname = server, então .. = raiz, server/uploads
+const projectRoot = path.resolve(__dirname, "..");
+const uploadsDir = path.join(projectRoot, "server", "uploads");
+
 try {
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
     console.log("✅ Diretório de uploads criado:", uploadsDir);
   }
+  
+  // Log para debug
+  console.log("📁 Diretório de uploads configurado:", uploadsDir);
+  console.log("📁 __dirname atual:", __dirname);
+  console.log("📁 Project root:", projectRoot);
+  
   // Servir arquivos estáticos de uploads ANTES da rota catch-all
   app.use("/uploads", express.static(uploadsDir, {
     setHeaders: (res) => {
@@ -37,6 +49,14 @@ try {
   
   // Middleware para tratar arquivos não encontrados em /uploads (após express.static)
   app.use("/uploads", (req, res) => {
+    console.log("⚠️ Arquivo não encontrado:", req.path, "Procurando em:", uploadsDir);
+    // Listar arquivos no diretório para debug
+    try {
+      const files = fs.readdirSync(uploadsDir);
+      console.log("📂 Arquivos no diretório:", files);
+    } catch (err) {
+      console.log("❌ Erro ao listar arquivos:", err);
+    }
     res.status(404).json({ error: "Arquivo não encontrado" });
   });
   

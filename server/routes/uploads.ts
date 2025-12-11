@@ -5,11 +5,21 @@ import multer from "multer";
 
 export const uploadsRouter = Router();
 
-const uploadDir = path.resolve(__dirname, "..", "uploads");
+// IMPORTANTE: Usar o mesmo caminho que o index.ts usa para servir arquivos
+// Caminho relativo ao diretório raiz do projeto (server/uploads)
+// Se compilado: __dirname = dist-server/routes, então .. = dist-server, .. = raiz, server/uploads
+// Se não compilado: __dirname = server/routes, então .. = server, .. = raiz, server/uploads
+const projectRoot = path.resolve(__dirname, "..", "..");
+const uploadDir = path.join(projectRoot, "server", "uploads");
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
+  console.log("✅ Diretório de uploads criado (routes):", uploadDir);
 }
+
+console.log("📁 Diretório de uploads (routes):", uploadDir);
+console.log("📁 __dirname (routes):", __dirname);
+console.log("📁 Project root:", projectRoot);
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
