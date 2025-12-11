@@ -10,17 +10,45 @@ export type Game = {
 };
 
 export async function listGames(): Promise<Game[]> {
-  const [rows] = await pool.query(
-    `SELECT g.id,
-            g.provider_id as providerId,
-            g.name,
-            g.external_id as externalId,
-            g.image_url as imageUrl,
-            g.active
-       FROM games g
-   ORDER BY g.id DESC`
-  );
-  return rows as Game[];
+  try {
+    const [rows] = await pool.query(
+      `SELECT g.id,
+              g.provider_id as providerId,
+              g.name,
+              g.external_id as externalId,
+              COALESCE(g.image_url, NULL) as imageUrl,
+              g.active
+         FROM games g
+     ORDER BY g.id DESC`
+    );
+    return rows as Game[];
+  } catch (error: any) {
+    // Se a coluna image_url não existir, tentar sem ela
+    if (error.code === "ER_BAD_FIELD_ERROR" && (error.message?.includes("image_url") || error.sqlMessage?.includes("image_url"))) {
+      // eslint-disable-next-line no-console
+      console.warn("⚠️ Coluna image_url não existe, buscando sem ela. Execute a migração do banco de dados.");
+      try {
+        const [rows] = await pool.query(
+          `SELECT g.id,
+                  g.provider_id as providerId,
+                  g.name,
+                  g.external_id as externalId,
+                  NULL as imageUrl,
+                  g.active
+             FROM games g
+         ORDER BY g.id DESC`
+        );
+        return rows as Game[];
+      } catch (fallbackError: any) {
+        // eslint-disable-next-line no-console
+        console.error("❌ Erro ao buscar jogos (fallback):", fallbackError);
+        throw fallbackError;
+      }
+    }
+    // eslint-disable-next-line no-console
+    console.error("❌ Erro ao buscar jogos:", error);
+    throw error;
+  }
 }
 
 export async function createGame(data: {

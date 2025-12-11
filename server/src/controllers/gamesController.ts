@@ -12,8 +12,19 @@ const gameSchema = z.object({
 });
 
 export async function listGamesController(_req: Request, res: Response): Promise<void> {
-  const games = await listGames();
-  res.json(games);
+  try {
+    const games = await listGames();
+    res.json(games);
+  } catch (error: any) {
+    // eslint-disable-next-line no-console
+    console.error("❌ Erro ao listar jogos:", error);
+    // eslint-disable-next-line no-console
+    console.error("Stack:", error.stack);
+    res.status(500).json({ 
+      error: error.message || "Erro ao listar jogos",
+      details: process.env.NODE_ENV === "development" ? error.stack : undefined
+    });
+  }
 }
 
 export async function createGameController(req: Request, res: Response): Promise<void> {

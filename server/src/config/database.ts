@@ -39,12 +39,28 @@ export async function initDb() {
     `);
 
     // Adicionar coluna image_url se não existir (para bancos já existentes)
-    await connection.query(`
-      ALTER TABLE games 
-      ADD COLUMN IF NOT EXISTS image_url TEXT
-    `).catch(() => {
-      // Ignorar erro se a coluna já existir
-    });
+    try {
+      const [columns] = await connection.query<any[]>(
+        `SELECT COLUMN_NAME 
+         FROM INFORMATION_SCHEMA.COLUMNS 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'games' 
+         AND COLUMN_NAME = 'image_url'`
+      );
+      
+      if (!columns || columns.length === 0) {
+        await connection.query(`
+          ALTER TABLE games 
+          ADD COLUMN image_url TEXT
+        `);
+        // eslint-disable-next-line no-console
+        console.log("✅ Coluna image_url adicionada à tabela games");
+      }
+    } catch (error: any) {
+      // Ignorar erro se a coluna já existir ou se houver outro problema
+      // eslint-disable-next-line no-console
+      console.warn("⚠️ Aviso ao verificar/adicionar coluna image_url:", error.message);
+    }
 
     await connection.query(`
       CREATE TABLE IF NOT EXISTS banners (
