@@ -108,16 +108,38 @@ export function HomePage() {
   useEffect(() => {
     void (async () => {
       try {
+        console.log("🔄 Carregando dados da API...", api.defaults.baseURL);
         const [gamesRes, providersRes, bannersRes] = await Promise.all([
-          api.get<Game[]>("/games"),
-          api.get<Provider[]>("/providers"),
-          api.get<Banner[]>("/banners").catch(() => ({ data: [] }))
+          api.get<Game[]>("/games").catch((err) => {
+            console.error("❌ Erro ao carregar jogos:", err.response?.status, err.message);
+            throw err;
+          }),
+          api.get<Provider[]>("/providers").catch((err) => {
+            console.error("❌ Erro ao carregar provedores:", err.response?.status, err.message);
+            throw err;
+          }),
+          api.get<Banner[]>("/banners").catch((err) => {
+            console.warn("⚠️ Erro ao carregar banners (continuando sem banners):", err.response?.status);
+            return { data: [] };
+          })
         ]);
-        setGames(gamesRes.data.filter((g) => g.active));
-        setProviders(providersRes.data);
-        setBanners(bannersRes.data.filter((b) => b.active));
-      } catch (error) {
-        console.error("Erro ao carregar dados:", error);
+        console.log("✅ Dados carregados:", {
+          games: gamesRes.data?.length || 0,
+          providers: providersRes.data?.length || 0,
+          banners: bannersRes.data?.length || 0
+        });
+        setGames((gamesRes.data || []).filter((g) => g.active));
+        setProviders(providersRes.data || []);
+        setBanners((bannersRes.data || []).filter((b) => b.active));
+      } catch (error: any) {
+        console.error("❌ Erro ao carregar dados:", error);
+        console.error("❌ URL da API:", api.defaults.baseURL);
+        console.error("❌ Status:", error.response?.status);
+        console.error("❌ Mensagem:", error.response?.data || error.message);
+        // Manter arrays vazios em caso de erro
+        setGames([]);
+        setProviders([]);
+        setBanners([]);
       } finally {
         setLoading(false);
       }
