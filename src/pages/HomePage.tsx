@@ -7,6 +7,7 @@ type Game = {
   name: string;
   providerId: number;
   externalId: string;
+  imageUrl?: string | null;
   active: boolean;
 };
 
@@ -181,6 +182,7 @@ export function HomePage() {
               title={game.name}
               provider={getProviderName(game.providerId)}
               gameId={game.id}
+              imageUrl={game.imageUrl || undefined}
               isFavorite={favorites.has(game.id)}
               onToggleFavorite={(gameId) => {
                 const newFavorites = new Set(favorites);
