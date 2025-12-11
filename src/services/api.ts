@@ -1,17 +1,21 @@
 import axios from "axios";
 
-// Usar URL do backend via env ou, por padrão, o mesmo domínio do frontend
-// Evita redirecionamentos em loop quando a origem é diferente (ex.: mobile + hostinger)
+// Usar URL do backend via env ou fallback para o backend real
+// IMPORTANTE: Se o frontend estiver no Hostinger e o backend em outro domínio,
+// configure VITE_API_URL durante o build ou use o fallback abaixo
+const backendUrl = "https://g40okoockcoskwwwgc4sowso.agenciamidas.com/api";
+
 const defaultApi =
   typeof window !== "undefined" && window.location.origin
     ? `${window.location.origin}/api`
-    : "https://g40okoockcoskwwwgc4sowso.agenciamidas.com/api";
+    : backendUrl;
 
 // Preferir VITE_API_URL (explícito) ou VITE_API_BASE_URL; cair para defaultApi
+// Se não houver env configurado, usar o backendUrl diretamente (backend em domínio diferente)
 const baseURL =
   (import.meta.env as any).VITE_API_URL ??
   (import.meta.env as any).VITE_API_BASE_URL ??
-  defaultApi;
+  backendUrl; // Usar backendUrl diretamente ao invés de defaultApi para evitar chamadas ao domínio errado
 
 export const api = axios.create({ baseURL });
 
