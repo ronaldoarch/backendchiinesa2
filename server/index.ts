@@ -21,6 +21,10 @@ app.use(
 );
 app.use(json());
 
+// ========== CONFIGURAÇÃO DE UPLOADS ==========
+console.log("🔧 [INIT] Iniciando configuração de uploads...");
+console.log("🔧 [INIT] __dirname:", __dirname);
+
 // Criar diretório de uploads se não existir
 // IMPORTANTE: Usar o mesmo caminho que routes/uploads.ts usa para salvar arquivos
 // Caminho relativo ao diretório raiz do projeto (server/uploads)
@@ -28,6 +32,9 @@ app.use(json());
 // Se não compilado: __dirname = server, então .. = raiz, server/uploads
 const projectRoot = path.resolve(__dirname, "..");
 const uploadsDir = path.join(projectRoot, "server", "uploads");
+
+console.log("🔧 [INIT] Project root calculado:", projectRoot);
+console.log("🔧 [INIT] Uploads dir calculado:", uploadsDir);
 
 try {
   if (!fs.existsSync(uploadsDir)) {
