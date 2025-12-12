@@ -25,14 +25,8 @@ export function GameCard({ title, provider, gameId, imageUrl, isFavorite = false
     e.stopPropagation();
     if (!gameId) return;
 
-    // Verificar se usuário está autenticado
-    const token = localStorage.getItem("token");
-    if (!token) {
-      alert("Você precisa estar logado para jogar");
-      return;
-    }
-
     // Navegar para a página do jogo
+    // A autenticação será verificada pela rota protegida e pelo GamePage
     navigate(`/jogo/${gameId}`);
   };
 

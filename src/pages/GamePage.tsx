@@ -16,10 +16,11 @@ export function GamePage() {
       return;
     }
 
-    // Verificar se usuário está autenticado
+    // A autenticação já foi verificada pelo ProtectedRoute
+    // Mas verificamos novamente aqui para garantir que o token ainda é válido
     const token = localStorage.getItem("token");
     if (!token) {
-      setError("Você precisa estar logado para jogar");
+      setError("Sessão expirada. Por favor, faça login novamente.");
       setLoading(false);
       setTimeout(() => navigate("/"), 2000);
       return;
