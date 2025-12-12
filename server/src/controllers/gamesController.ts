@@ -110,14 +110,14 @@ export async function launchGameController(req: Request, res: Response): Promise
     return;
   }
 
-  // Obter informações do usuário (se autenticado)
+  // Obter informações do usuário (autenticação já validada pelo middleware)
   const authReq = req as any;
-  const userId = authReq.user?.id;
+  const userId = authReq.userId;
   const username = authReq.user?.username || authReq.user?.email;
   
   // user_code: usar username/email do usuário ou ID como fallback
-  // Se não autenticado, usar um código padrão ou retornar erro
-  const userCode = username || (userId ? `user_${userId}` : null);
+  // Conforme documentação PlayFivers, user_code deve ser uma string identificando o usuário
+  const userCode = username || (userId ? `user_${userId}` : `user_${userId}`);
   
   if (!userCode) {
     res.status(401).json({ error: "Usuário não autenticado. Faça login para jogar." });

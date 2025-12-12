@@ -19,6 +19,6 @@ gamesRouter.post("/", authenticate, requireAdmin, asyncHandler(createGameControl
 gamesRouter.put("/:id", authenticate, requireAdmin, asyncHandler(updateGameController));
 gamesRouter.post("/:id/sync-playfivers", authenticate, requireAdmin, asyncHandler(syncGamePlayfiversController));
 
-// Lançar jogo (público - qualquer usuário pode jogar)
-gamesRouter.post("/:id/launch", asyncHandler(launchGameController));
+// Lançar jogo (requer autenticação - usuário logado pode jogar)
+gamesRouter.post("/:id/launch", authenticate, asyncHandler(launchGameController));
 

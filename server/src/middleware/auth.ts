@@ -4,6 +4,11 @@ import { verifyToken } from "../services/authService";
 export interface AuthRequest extends Request {
   userId?: number;
   userIsAdmin?: boolean;
+  user?: {
+    id: number;
+    username: string;
+    email?: string;
+  };
 }
 
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
@@ -23,6 +28,12 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
   }
 
   (req as AuthRequest).userId = decoded.id;
+  // Adicionar username ao request para uso em controllers
+  (req as AuthRequest).user = {
+    id: decoded.id,
+    username: decoded.username,
+    email: decoded.username // Usar username como email também
+  };
   // Garantir que is_admin seja boolean (pode vir como 0/1 do JWT)
   // Fazer cast para any para permitir verificação de diferentes tipos em runtime
   const isAdminValue: any = decoded.is_admin;
