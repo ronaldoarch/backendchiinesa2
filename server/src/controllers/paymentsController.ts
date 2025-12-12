@@ -375,23 +375,36 @@ export async function webhookController(req: Request, res: Response): Promise<vo
     }
 
     // Validar hash do webhook (se fornecido)
+    // IMPORTANTE: A validação do hash é obrigatória para segurança
+    // Conforme documentação SuitPay: validar hash SHA-256
     if (hash) {
       const suitpayServiceModule = await import("../services/suitpayService");
       const creds = await suitpayServiceModule.suitpayService.getCredentials();
       
-      // Remover hash do payload para validação
+      if (!creds.clientSecret) {
+        console.error("❌ Client Secret não configurado - não é possível validar hash");
+        res.status(500).json({ error: "Configuração incompleta" });
+        return;
+      }
+      
+      // Remover hash do payload para validação (manter ordem original dos campos)
+      // IMPORTANTE: A ordem dos campos deve ser mantida conforme recebido
       const payloadWithoutHash = { ...webhookData };
       delete payloadWithoutHash.hash;
 
       const isValid = suitpayServiceModule.validateWebhookHash(payloadWithoutHash, hash, creds.clientSecret);
       if (!isValid) {
         console.error("❌ Hash do webhook inválido:", requestNumber);
+        console.error("❌ Payload recebido:", JSON.stringify(webhookData, null, 2));
         res.status(401).json({ error: "Hash inválido" });
         return;
       }
       console.log("✅ Hash do webhook validado com sucesso");
     } else {
-      console.warn("⚠️ Webhook sem hash - validação não realizada");
+      console.warn("⚠️ Webhook sem hash - validação não realizada (não recomendado em produção)");
+      // Em produção, você pode querer rejeitar webhooks sem hash
+      // res.status(401).json({ error: "Hash não fornecido" });
+      // return;
     }
 
     // Atualizar status da transação
@@ -403,9 +416,14 @@ export async function webhookController(req: Request, res: Response): Promise<vo
     );
 
     // Se pagamento foi aprovado (PAID_OUT), atualizar saldo do usuário
+    // Status possíveis: PAID_OUT (pago), CANCELED (cancelado), CHARGEBACK (estorno)
     if (status === "PAID_OUT" && transaction.status !== "PAID_OUT") {
       await updateUserBalance(transaction.userId, transaction.amount);
       console.log(`✅ Saldo atualizado para usuário ${transaction.userId}: +${transaction.amount}`);
+    } else if (status === "CHARGEBACK" && transaction.status === "PAID_OUT") {
+      // Se houve estorno, reverter o saldo
+      await updateUserBalance(transaction.userId, -transaction.amount);
+      console.log(`⚠️ Estorno processado para usuário ${transaction.userId}: -${transaction.amount}`);
     }
 
     console.log(`✅ Webhook processado: ${requestNumber} -> ${status}`);
@@ -433,6 +451,92 @@ export async function listTransactionsController(req: Request, res: Response): P
   } catch (error: any) {
     console.error("Erro ao listar transações:", error);
     res.status(500).json({ error: error.message || "Erro ao listar transações" });
+  }
+}
+
+export async function getTransactionController(req: Request, res: Response): Promise<void> {
+  try {
+    const authReq = req as any;
+    const userId = authReq.userId;
+    const { requestNumber } = req.params;
+
+    if (!userId) {
+      res.status(401).json({ error: "Usuário não autenticado" });
+      return;
+    }
+
+    const transaction = await findTransactionByRequestNumber(requestNumber);
+
+    if (!transaction) {
+      res.status(404).json({ error: "Transação não encontrada" });
+      return;
+    }
+
+    // Verificar se a transação pertence ao usuário
+    if (transaction.userId !== userId) {
+      res.status(403).json({ error: "Acesso negado" });
+      return;
+    }
+
+    res.json(transaction);
+  } catch (error: any) {
+    console.error("Erro ao buscar transação:", error);
+    res.status(500).json({ error: error.message || "Erro ao buscar transação" });
+  }
+}
+
+export async function cancelTransactionController(req: Request, res: Response): Promise<void> {
+  try {
+    const authReq = req as any;
+    const userId = authReq.userId;
+    const { requestNumber } = req.params;
+
+    if (!userId) {
+      res.status(401).json({ error: "Usuário não autenticado" });
+      return;
+    }
+
+    // Buscar transação
+    const transaction = await findTransactionByRequestNumber(requestNumber);
+
+    if (!transaction) {
+      res.status(404).json({ error: "Transação não encontrada" });
+      return;
+    }
+
+    // Verificar se a transação pertence ao usuário
+    if (transaction.userId !== userId) {
+      res.status(403).json({ error: "Acesso negado" });
+      return;
+    }
+
+    // Verificar se pode cancelar (apenas pendentes)
+    if (transaction.status !== "PENDING") {
+      res.status(400).json({ error: "Apenas transações pendentes podem ser canceladas" });
+      return;
+    }
+
+    // Chamar API SuitPay para cancelar
+    const result = await suitpayService.cancelTransaction(requestNumber);
+
+    if (!result.success) {
+      res.status(500).json({
+        error: result.error || "Erro ao cancelar transação",
+        message: result.message
+      });
+      return;
+    }
+
+    // Atualizar status no banco
+    await updateTransactionStatus(requestNumber, "CANCELED");
+
+    res.json({
+      success: true,
+      message: "Transação cancelada com sucesso"
+    });
+  } catch (error: any) {
+    console.error("Erro ao cancelar transação:", error);
+    res.status(500).json({ error: error.message || "Erro ao cancelar transação" });
   }
 }
 

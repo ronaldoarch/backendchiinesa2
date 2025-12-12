@@ -5,6 +5,8 @@ import {
   createBoletoPaymentController,
   webhookController,
   listTransactionsController,
+  getTransactionController,
+  cancelTransactionController,
   testConnectionController
 } from "../controllers/paymentsController";
 import { asyncHandler } from "../middleware/asyncHandler";
@@ -17,6 +19,8 @@ paymentsRouter.post("/pix", authenticate, asyncHandler(createPixPaymentControlle
 paymentsRouter.post("/card", authenticate, asyncHandler(createCardPaymentController));
 paymentsRouter.post("/boleto", authenticate, asyncHandler(createBoletoPaymentController));
 paymentsRouter.get("/transactions", authenticate, asyncHandler(listTransactionsController));
+paymentsRouter.get("/transactions/:requestNumber", authenticate, asyncHandler(getTransactionController));
+paymentsRouter.post("/transactions/:requestNumber/cancel", authenticate, asyncHandler(cancelTransactionController));
 paymentsRouter.post("/test-connection", authenticate, requireAdmin, asyncHandler(testConnectionController));
 
 // Webhook público (não requer autenticação, mas valida hash)

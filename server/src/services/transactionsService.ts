@@ -12,9 +12,9 @@ export type Transaction = {
   qrCodeBase64?: string | null;
   barcode?: string | null;
   digitableLine?: string | null;
-  dueDate?: Date | null;
+  dueDate?: Date | string | null;
   callbackUrl?: string | null;
-  metadata?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -74,7 +74,19 @@ export async function findTransactionByRequestNumber(requestNumber: string): Pro
     [requestNumber]
   );
 
-  return (rows as Transaction[])[0] || null;
+  const transaction = (rows as any[])[0];
+  if (!transaction) return null;
+
+  // Parse metadata se for string
+  if (transaction.metadata && typeof transaction.metadata === "string") {
+    try {
+      transaction.metadata = JSON.parse(transaction.metadata);
+    } catch {
+      transaction.metadata = {};
+    }
+  }
+
+  return transaction as Transaction;
 }
 
 export async function updateTransactionStatus(
@@ -95,8 +107,12 @@ export async function updateTransactionStatus(
   }
 
   if (metadata) {
+    // Mesclar com metadata existente se houver
+    const existing = await findTransactionByRequestNumber(requestNumber);
+    const existingMetadata = existing?.metadata ? (typeof existing.metadata === "string" ? JSON.parse(existing.metadata) : existing.metadata) : {};
+    const mergedMetadata = { ...existingMetadata, ...metadata };
     updates.push("metadata = ?");
-    values.push(JSON.stringify(metadata));
+    values.push(JSON.stringify(mergedMetadata));
   }
 
   values.push(requestNumber);
@@ -115,7 +131,17 @@ export async function listUserTransactions(userId: number): Promise<Transaction[
     [userId]
   );
 
-  return rows as Transaction[];
+  // Parse metadata para cada transação
+  return (rows as any[]).map((row) => {
+    if (row.metadata && typeof row.metadata === "string") {
+      try {
+        row.metadata = JSON.parse(row.metadata);
+      } catch {
+        row.metadata = {};
+      }
+    }
+    return row as Transaction;
+  });
 }
 
 export async function updateUserBalance(userId: number, amount: number): Promise<void> {

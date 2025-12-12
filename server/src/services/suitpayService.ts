@@ -124,6 +124,10 @@ async function createClient(): Promise<AxiosInstance> {
  * @param clientSecret - Client Secret para validação
  * @returns true se o hash for válido
  */
+/**
+ * Validar hash SHA-256 do webhook SuitPay
+ * Conforme documentação: manter a ordem original dos campos (não ordenar)
+ */
 export function validateWebhookHash(
   payload: Record<string, unknown>,
   hash: string,
@@ -131,9 +135,11 @@ export function validateWebhookHash(
 ): boolean {
   try {
     // 1. Concatene todos os valores dos campos (exceto o próprio hash) em uma única string
-    // Mantenha a ordem dos valores consistente com a ordem recebida no JSON
-    const orderedKeys = Object.keys(payload).filter(key => key !== "hash").sort();
-    const concatenated = orderedKeys.map(key => String(payload[key] || "")).join("");
+    // IMPORTANTE: Manter a ordem dos valores consistente com a ordem recebida no JSON
+    // Não ordenar alfabeticamente - usar a ordem original
+    const keys = Object.keys(payload).filter(key => key !== "hash");
+    // Manter ordem original (não usar sort())
+    const concatenated = keys.map(key => String(payload[key] || "")).join("");
 
     // 2. Concatene seu ClientSecret (cs) com o resultado da etapa 1
     const withSecret = clientSecret + concatenated;
@@ -141,11 +147,21 @@ export function validateWebhookHash(
     // 3. Calcule o hash SHA-256 da string resultante da etapa 2
     const calculatedHash = crypto
       .createHash("sha256")
-      .update(withSecret)
+      .update(withSecret, "utf8")
       .digest("hex");
 
     // 4. Compare o hash SHA-256 resultante com o campo hash na carga recebida
-    return calculatedHash.toLowerCase() === hash.toLowerCase();
+    const isValid = calculatedHash.toLowerCase() === hash.toLowerCase();
+    
+    if (!isValid) {
+      console.warn("⚠️ Hash do webhook não corresponde:", {
+        calculated: calculatedHash.substring(0, 16) + "...",
+        received: hash.substring(0, 16) + "...",
+        concatenatedLength: concatenated.length
+      });
+    }
+    
+    return isValid;
   } catch (error) {
     console.error("Erro ao validar hash do webhook:", error);
     return false;
