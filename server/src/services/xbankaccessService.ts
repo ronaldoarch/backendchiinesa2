@@ -173,6 +173,9 @@ export const xbankaccessService = {
       const { data } = await client.post<XBankAccessPixInResponse>("/wallet/deposit/payment", payload);
 
       console.log(`✅ Pagamento PIX-IN criado: ${data.idTransaction}`);
+      console.log(`📋 QR Code (copia e cola): ${data.qrcode}`);
+      console.log(`🖼️ QR Code Image URL: ${data.qr_code_image_url}`);
+      console.log(`📦 Resposta completa:`, JSON.stringify(data, null, 2));
 
       return {
         success: true,

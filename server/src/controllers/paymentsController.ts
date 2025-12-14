@@ -157,6 +157,14 @@ export async function createPixPaymentController(req: Request, res: Response): P
     // Atualizar transação com dados retornados (formato diferente por gateway)
     if (gateway === "xbankaccess" && result.data) {
       // XBankAccess retorna: idTransaction, qrcode, qr_code_image_url
+      console.log("📦 Dados retornados do XBankAccess:", {
+        idTransaction: result.data.idTransaction,
+        qrcode: result.data.qrcode,
+        qr_code_image_url: result.data.qr_code_image_url,
+        hasQrcode: !!result.data.qrcode,
+        hasQrCodeImageUrl: !!result.data.qr_code_image_url
+      });
+
       await updateTransactionStatus(
         requestNumber,
         "PENDING",
@@ -174,17 +182,22 @@ export async function createPixPaymentController(req: Request, res: Response): P
         );
       }
 
+      const transactionResponse = {
+        id: transaction.id,
+        requestNumber,
+        transactionId: result.data.idTransaction,
+        qrCode: result.data.qrcode,
+        qrCodeBase64: result.data.qr_code_image_url,
+        amount,
+        status: "PENDING",
+        dueDate: expirationDate
+      };
+
+      console.log("📤 Enviando resposta para o frontend:", transactionResponse);
+
       res.status(201).json({
         success: true,
-        transaction: {
-          id: transaction.id,
-          requestNumber,
-          transactionId: result.data.idTransaction,
-          qrCode: result.data.qrcode,
-          qrCodeBase64: result.data.qr_code_image_url,
-          amount,
-          status: "PENDING"
-        }
+        transaction: transactionResponse
       });
     } else {
       // SuitPay

@@ -103,6 +103,9 @@ export function DepositPage() {
       }
 
       if (response.data.success && response.data.transaction) {
+        console.log("✅ Transação criada:", response.data.transaction);
+        console.log("📋 QR Code:", response.data.transaction.qrCode);
+        console.log("🖼️ QR Code Base64/URL:", response.data.transaction.qrCodeBase64);
         setTransaction(response.data.transaction);
         setAmount("");
       } else {
@@ -152,22 +155,48 @@ export function DepositPage() {
           }}>
             <h3 style={{ marginTop: 0, color: "var(--gold)" }}>Pagamento criado com sucesso!</h3>
             
-            {selectedMethod === "PIX" && transaction.qrCode && (
+            {selectedMethod === "PIX" && (
               <div>
                 <p>Escaneie o QR Code abaixo para pagar:</p>
                 {transaction.qrCodeBase64 ? (
-                  <img
-                    src={`data:image/png;base64,${transaction.qrCodeBase64}`}
-                    alt="QR Code PIX"
-                    style={{
-                      maxWidth: "100%",
-                      height: "auto",
-                      margin: "16px 0",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: "8px"
-                    }}
-                  />
-                ) : (
+                  // Verificar se é uma URL ou base64
+                  transaction.qrCodeBase64.startsWith("http") ? (
+                    <img
+                      src={transaction.qrCodeBase64}
+                      alt="QR Code PIX"
+                      style={{
+                        maxWidth: "100%",
+                        height: "auto",
+                        margin: "16px 0",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "8px"
+                      }}
+                      onError={(e) => {
+                        console.error("Erro ao carregar imagem QR Code:", e);
+                        // Se a imagem falhar, mostrar o código copia e cola
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <img
+                      src={`data:image/png;base64,${transaction.qrCodeBase64}`}
+                      alt="QR Code PIX"
+                      style={{
+                        maxWidth: "100%",
+                        height: "auto",
+                        margin: "16px 0",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "8px"
+                      }}
+                      onError={(e) => {
+                        console.error("Erro ao carregar QR Code base64:", e);
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = "none";
+                      }}
+                    />
+                  )
+                ) : transaction.qrCode ? (
                   <div style={{
                     padding: "16px",
                     background: "#fff",
@@ -175,14 +204,30 @@ export function DepositPage() {
                     margin: "16px 0",
                     wordBreak: "break-all",
                     fontFamily: "monospace",
-                    fontSize: "12px"
+                    fontSize: "12px",
+                    color: "#000"
                   }}>
+                    <strong>Código PIX (Copiar e Colar):</strong>
+                    <br />
                     {transaction.qrCode}
                   </div>
+                ) : (
+                  <div style={{
+                    padding: "16px",
+                    background: "rgba(255, 107, 107, 0.1)",
+                    border: "1px solid #ff6b6b",
+                    borderRadius: "8px",
+                    margin: "16px 0",
+                    color: "#ff6b6b"
+                  }}>
+                    QR Code não disponível. Verifique os logs do servidor.
+                  </div>
                 )}
-                <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
-                  Vencimento: {transaction.dueDate ? new Date(transaction.dueDate).toLocaleDateString("pt-BR") : "N/A"}
-                </p>
+                {transaction.qrCode && (
+                  <p style={{ fontSize: "12px", color: "var(--text-muted)", marginTop: "8px" }}>
+                    Vencimento: {transaction.dueDate ? new Date(transaction.dueDate).toLocaleDateString("pt-BR") : "N/A"}
+                  </p>
+                )}
               </div>
             )}
 
