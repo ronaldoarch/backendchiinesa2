@@ -225,6 +225,103 @@ export async function initDb() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
+    // Tabela de bônus configurados
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS bonuses (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        type ENUM('first_deposit', 'deposit', 'vip_level', 'custom') NOT NULL,
+        bonus_percentage DECIMAL(5, 2) DEFAULT 0.00,
+        bonus_fixed DECIMAL(10, 2) DEFAULT 0.00,
+        min_deposit DECIMAL(10, 2) DEFAULT 0.00,
+        max_bonus DECIMAL(10, 2) DEFAULT NULL,
+        rollover_multiplier DECIMAL(5, 2) DEFAULT 1.00,
+        rtp_percentage DECIMAL(5, 2) DEFAULT 96.00,
+        active BOOLEAN NOT NULL DEFAULT true,
+        vip_level_required INT DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_type (type),
+        INDEX idx_active (active),
+        INDEX idx_vip_level (vip_level_required)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // Tabela de bônus recebidos pelos usuários
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS user_bonuses (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        bonus_id INT NOT NULL,
+        transaction_id INT NULL,
+        bonus_amount DECIMAL(10, 2) NOT NULL,
+        deposit_amount DECIMAL(10, 2) NOT NULL,
+        rollover_required DECIMAL(10, 2) NOT NULL,
+        rollover_completed DECIMAL(10, 2) DEFAULT 0.00,
+        status ENUM('pending', 'active', 'completed', 'cancelled') DEFAULT 'active',
+        rtp_percentage DECIMAL(5, 2) DEFAULT 96.00,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (bonus_id) REFERENCES bonuses(id) ON DELETE CASCADE,
+        FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL,
+        INDEX idx_user_id (user_id),
+        INDEX idx_bonus_id (bonus_id),
+        INDEX idx_status (status),
+        INDEX idx_transaction_id (transaction_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // Tabela de apostas para calcular rollover
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS user_bets (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        user_bonus_id INT NULL,
+        game_id INT NULL,
+        bet_amount DECIMAL(10, 2) NOT NULL,
+        win_amount DECIMAL(10, 2) DEFAULT 0.00,
+        net_amount DECIMAL(10, 2) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_bonus_id) REFERENCES user_bonuses(id) ON DELETE SET NULL,
+        INDEX idx_user_id (user_id),
+        INDEX idx_user_bonus_id (user_bonus_id),
+        INDEX idx_created_at (created_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+
+    // Adicionar colunas VIP na tabela users
+    try {
+      const [vipColumns] = await connection.query<RowDataPacket[]>(
+        `SELECT COLUMN_NAME 
+         FROM INFORMATION_SCHEMA.COLUMNS 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'users' 
+         AND COLUMN_NAME IN ('vip_level', 'total_bet_amount')`
+      );
+      
+      const existingColumns = vipColumns.map((row: any) => row.COLUMN_NAME);
+      
+      if (!existingColumns.includes('vip_level')) {
+        await connection.query(`
+          ALTER TABLE users 
+          ADD COLUMN vip_level INT DEFAULT 0
+        `);
+        console.log("✅ Coluna vip_level adicionada à tabela users");
+      }
+      
+      if (!existingColumns.includes('total_bet_amount')) {
+        await connection.query(`
+          ALTER TABLE users 
+          ADD COLUMN total_bet_amount DECIMAL(10, 2) DEFAULT 0.00
+        `);
+        console.log("✅ Coluna total_bet_amount adicionada à tabela users");
+      }
+    } catch (error: any) {
+      console.warn("⚠️ Aviso ao verificar/adicionar colunas VIP:", error.message);
+    }
+
     // eslint-disable-next-line no-console
     console.log("✅ Banco de dados MySQL conectado e tabelas criadas com sucesso!");
   } catch (error) {

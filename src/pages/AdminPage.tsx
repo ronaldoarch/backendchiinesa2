@@ -9,6 +9,7 @@ import { AdminDepositsPage } from "./admin/AdminDepositsPage";
 import { AdminPromotionsPage } from "./admin/AdminPromotionsPage";
 import { AdminSuitPayPage } from "./admin/AdminSuitPayPage";
 import { AdminTrackingPage } from "./admin/AdminTrackingPage";
+import { AdminBonusesPage } from "./admin/AdminBonusesPage";
 
 export function AdminPage() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -130,6 +131,15 @@ export function AdminPage() {
           >
             Tracking
           </NavLink>
+          <NavLink
+            to="/admin/bonuses"
+            className={({ isActive }) =>
+              `admin-menu-item${isActive ? " active" : ""}`
+            }
+            onClick={() => setMenuOpen(false)}
+          >
+            Bônus
+          </NavLink>
         </nav>
       </aside>
 
@@ -144,6 +154,7 @@ export function AdminPage() {
           <Route path="promocoes" element={<AdminPromotionsPage />} />
           <Route path="suitpay" element={<AdminSuitPayPage />} />
           <Route path="tracking" element={<AdminTrackingPage />} />
+          <Route path="bonuses" element={<AdminBonusesPage />} />
           <Route path="*" element={<Navigate to="/admin" replace />} />
         </Routes>
       </div>

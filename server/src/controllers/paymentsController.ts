@@ -5,6 +5,7 @@ import { suitpayService, SuitPayPixRequest, SuitPayCardRequest, SuitPayBoletoReq
 import { xbankaccessService, XBankAccessPixInRequest, XBankAccessPixOutRequest } from "../services/xbankaccessService";
 import { createTransaction, updateTransactionStatus, updateUserBalance, findTransactionByRequestNumber, listUserTransactions } from "../services/transactionsService";
 import { trackEvent, TrackingEvents } from "../services/trackingService";
+import { applyBonusToDeposit, canUserWithdraw } from "../services/bonusService";
 import { pool } from "../config/database";
 
 const pixRequestSchema = z.object({
@@ -520,6 +521,28 @@ export async function webhookController(req: Request, res: Response): Promise<vo
     if (status === "PAID_OUT" && transaction.status !== "PAID_OUT") {
       await updateUserBalance(transaction.userId, transaction.amount);
       console.log(`✅ Saldo atualizado para usuário ${transaction.userId}: +${transaction.amount}`);
+      
+      // Aplicar bônus se houver um bônus configurado
+      try {
+        // Buscar ID da transação pelo request_number
+        const [transRows] = await pool.query<RowDataPacket[]>(
+          `SELECT id FROM transactions WHERE request_number = ?`,
+          [requestNumber]
+        );
+        const transactionId = transRows.length > 0 ? transRows[0].id : null;
+        
+        const userBonus = await applyBonusToDeposit(
+          transaction.userId,
+          transactionId || undefined,
+          transaction.amount
+        );
+        if (userBonus) {
+          console.log(`🎁 Bônus aplicado: R$ ${userBonus.bonusAmount} para usuário ${transaction.userId}`);
+        }
+      } catch (error: any) {
+        console.error("Erro ao aplicar bônus:", error);
+        // Não falhar o webhook se o bônus falhar
+      }
     } else if (status === "CHARGEBACK" && transaction.status === "PAID_OUT") {
       // Se houve estorno, reverter o saldo
       await updateUserBalance(transaction.userId, -transaction.amount);
@@ -683,6 +706,16 @@ export async function createPixOutController(req: Request, res: Response): Promi
 
     const { amount, pixKey, pixKeyType } = parsed.data;
 
+    // Verificar se usuário pode sacar (rollover completo)
+    const canWithdraw = await canUserWithdraw(userId);
+    if (!canWithdraw.can) {
+      res.status(400).json({
+        error: "Não é possível sacar",
+        message: canWithdraw.reason || "Você precisa completar o rollover antes de sacar"
+      });
+      return;
+    }
+
     // Gerar requestNumber único
     const requestNumber = uuidv4();
 
@@ -810,6 +843,28 @@ export async function xbankaccessWebhookController(req: Request, res: Response):
         // Depósito - adicionar saldo
         await updateUserBalance(transaction.user_id, Math.abs(transaction.amount));
         console.log(`✅ Saldo atualizado (depósito) para usuário ${transaction.user_id}: +${Math.abs(transaction.amount)}`);
+        
+        // Aplicar bônus se houver um bônus configurado
+        try {
+          // Buscar ID da transação pelo request_number
+          const [transRows] = await pool.query<RowDataPacket[]>(
+            `SELECT id FROM transactions WHERE request_number = ?`,
+            [transaction.request_number]
+          );
+          const transactionId = transRows.length > 0 ? transRows[0].id : null;
+          
+          const userBonus = await applyBonusToDeposit(
+            transaction.user_id,
+            transactionId || undefined,
+            Math.abs(transaction.amount)
+          );
+          if (userBonus) {
+            console.log(`🎁 Bônus aplicado: R$ ${userBonus.bonusAmount} para usuário ${transaction.user_id}`);
+          }
+        } catch (error: any) {
+          console.error("Erro ao aplicar bônus:", error);
+          // Não falhar o webhook se o bônus falhar
+        }
         
         // Tracking: Depósito pago
         trackEvent({
