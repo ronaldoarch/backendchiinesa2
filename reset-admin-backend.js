@@ -30,10 +30,18 @@ async function resetAdminPassword() {
   console.log(`   Username: ${username}`);
   console.log(`   Nova senha: ${newPassword}`);
   console.log(`   Banco: ${dbConfig.database}@${dbConfig.host}:${dbConfig.port}`);
+  console.log(`   User: ${dbConfig.user}`);
+  console.log(`   Password configurado: ${dbConfig.password ? 'Sim (' + dbConfig.password.substring(0, 5) + '...)' : 'Não'}`);
   
   if (!dbConfig.password) {
     console.error("❌ Erro: DB_PASSWORD não configurado!");
     console.log("   Configure a variável DB_PASSWORD no .env ou nas variáveis de ambiente");
+    console.log("   Variáveis encontradas:");
+    console.log(`     DB_HOST: ${process.env.DB_HOST || 'não definido'}`);
+    console.log(`     DB_PORT: ${process.env.DB_PORT || 'não definido'}`);
+    console.log(`     DB_USER: ${process.env.DB_USER || 'não definido'}`);
+    console.log(`     DB_PASSWORD: ${process.env.DB_PASSWORD ? 'definido' : 'não definido'}`);
+    console.log(`     DB_NAME: ${process.env.DB_NAME || 'não definido'}`);
     process.exit(1);
   }
   

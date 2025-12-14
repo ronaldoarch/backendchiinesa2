@@ -137,6 +137,51 @@ export async function initDb() {
       console.warn("⚠️ Aviso ao verificar/adicionar coluna balance:", error.message);
     }
 
+    // Adicionar colunas email e document se não existirem (migração)
+    try {
+      const [emailColumns] = await connection.query<RowDataPacket[]>(
+        `SELECT COLUMN_NAME 
+         FROM INFORMATION_SCHEMA.COLUMNS 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'users' 
+         AND COLUMN_NAME = 'email'`
+      );
+      
+      if (!emailColumns || emailColumns.length === 0) {
+        await connection.query(`
+          ALTER TABLE users 
+          ADD COLUMN email VARCHAR(255) NULL
+        `);
+        // eslint-disable-next-line no-console
+        console.log("✅ Coluna email adicionada à tabela users");
+      }
+    } catch (error: any) {
+      // eslint-disable-next-line no-console
+      console.warn("⚠️ Aviso ao verificar/adicionar coluna email:", error.message);
+    }
+
+    try {
+      const [documentColumns] = await connection.query<RowDataPacket[]>(
+        `SELECT COLUMN_NAME 
+         FROM INFORMATION_SCHEMA.COLUMNS 
+         WHERE TABLE_SCHEMA = DATABASE() 
+         AND TABLE_NAME = 'users' 
+         AND COLUMN_NAME = 'document'`
+      );
+      
+      if (!documentColumns || documentColumns.length === 0) {
+        await connection.query(`
+          ALTER TABLE users 
+          ADD COLUMN document VARCHAR(20) NULL
+        `);
+        // eslint-disable-next-line no-console
+        console.log("✅ Coluna document adicionada à tabela users");
+      }
+    } catch (error: any) {
+      // eslint-disable-next-line no-console
+      console.warn("⚠️ Aviso ao verificar/adicionar coluna document:", error.message);
+    }
+
     await connection.query(`
       CREATE TABLE IF NOT EXISTS transactions (
         id INT AUTO_INCREMENT PRIMARY KEY,
