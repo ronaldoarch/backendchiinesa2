@@ -7,6 +7,7 @@ import { createTransaction, updateTransactionStatus, updateUserBalance, findTran
 import { trackEvent, TrackingEvents } from "../services/trackingService";
 import { applyBonusToDeposit, canUserWithdraw } from "../services/bonusService";
 import { pool } from "../config/database";
+import { RowDataPacket } from "mysql2";
 
 const pixRequestSchema = z.object({
   amount: z.number().positive(),
