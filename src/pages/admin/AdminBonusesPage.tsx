@@ -344,14 +344,14 @@ export function AdminBonusesPage() {
                       {bonus.type === "custom" && "Personalizado"}
                     </td>
                     <td>
-                      {bonus.bonusPercentage > 0 && `${bonus.bonusPercentage}%`}
-                      {bonus.bonusPercentage > 0 && bonus.bonusFixed > 0 && " + "}
-                      {bonus.bonusFixed > 0 && `R$ ${bonus.bonusFixed.toFixed(2)}`}
-                      {bonus.maxBonus && ` (máx: R$ ${bonus.maxBonus.toFixed(2)})`}
+                      {Number(bonus.bonusPercentage) > 0 && `${Number(bonus.bonusPercentage)}%`}
+                      {Number(bonus.bonusPercentage) > 0 && Number(bonus.bonusFixed) > 0 && " + "}
+                      {Number(bonus.bonusFixed) > 0 && `R$ ${Number(bonus.bonusFixed).toFixed(2)}`}
+                      {bonus.maxBonus && ` (máx: R$ ${Number(bonus.maxBonus).toFixed(2)})`}
                     </td>
-                    <td>R$ {bonus.minDeposit.toFixed(2)}</td>
-                    <td>{bonus.rolloverMultiplier}x</td>
-                    <td>{bonus.rtpPercentage}%</td>
+                    <td>R$ {Number(bonus.minDeposit).toFixed(2)}</td>
+                    <td>{Number(bonus.rolloverMultiplier)}x</td>
+                    <td>{Number(bonus.rtpPercentage)}%</td>
                     <td>
                       {bonus.active ? (
                         <span style={{ color: "#90ee90" }}>Ativo</span>
