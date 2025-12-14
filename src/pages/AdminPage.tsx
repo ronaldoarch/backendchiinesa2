@@ -22,6 +22,12 @@ export function AdminPage() {
         ☰
       </button>
 
+      {menuOpen && (
+        <div 
+          className="admin-menu-overlay"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
       <aside className={`admin-menu ${menuOpen ? "open" : ""}`}>
         <h2 className="admin-menu-title">Painel Admin</h2>
         <nav className="admin-menu-list">
