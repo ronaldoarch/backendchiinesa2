@@ -37,8 +37,12 @@ export async function registerController(req: Request, res: Response): Promise<v
   }
 
   try {
+    console.log("📝 [REGISTER] Tentando criar usuário:", { username, hasPhone: !!phone, currency });
     const user = await createUser(username, password, phone, currency);
+    console.log("✅ [REGISTER] Usuário criado:", { id: user.id, username: user.username });
+    
     const token = generateToken(user);
+    console.log("🔑 [REGISTER] Token gerado");
 
     res.status(201).json({
       user: {
@@ -50,10 +54,20 @@ export async function registerController(req: Request, res: Response): Promise<v
       },
       token
     });
-  } catch (error) {
+    console.log("✅ [REGISTER] Resposta enviada com sucesso");
+  } catch (error: any) {
     // eslint-disable-next-line no-console
-    console.error("Erro ao criar usu?rio:", error);
-    res.status(500).json({ error: "Erro ao criar usu?rio" });
+    console.error("❌ [REGISTER] Erro ao criar usuário:", {
+      message: error.message,
+      code: error.code,
+      sqlState: error.sqlState,
+      sqlMessage: error.sqlMessage,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      error: "Erro ao criar usuário",
+      details: process.env.NODE_ENV === "development" ? error.message : undefined
+    });
   }
 }
 

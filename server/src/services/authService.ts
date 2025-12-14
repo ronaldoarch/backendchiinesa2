@@ -24,26 +24,52 @@ export async function createUser(
   phone?: string,
   currency: string = "BRL"
 ): Promise<User> {
-  const passwordHash = await bcrypt.hash(password, 10);
+  console.log("📝 [CREATE_USER] Iniciando criação de usuário:", { username, phone, currency });
   
-  const [result] = await pool.query(
-    `INSERT INTO users (username, password_hash, phone, currency) 
-     VALUES (?, ?, ?, ?)`,
-    [username, passwordHash, phone || null, currency]
-  );
+  const passwordHash = await bcrypt.hash(password, 10);
+  console.log("🔐 [CREATE_USER] Senha criptografada");
+  
+  try {
+    const [result] = await pool.query(
+      `INSERT INTO users (username, password_hash, phone, currency) 
+       VALUES (?, ?, ?, ?)`,
+      [username, passwordHash, phone || null, currency]
+    );
 
-  const insertResult = result as { insertId: number };
-  const [rows] = await pool.query<RowDataPacket[]>(
-    "SELECT id, username, phone, currency, is_admin, created_at FROM users WHERE id = ?",
-    [insertResult.insertId]
-  );
+    const insertResult = result as { insertId: number };
+    console.log("✅ [CREATE_USER] Usuário inserido no banco, ID:", insertResult.insertId);
+    
+    const [rows] = await pool.query<RowDataPacket[]>(
+      "SELECT id, username, phone, currency, is_admin, created_at FROM users WHERE id = ?",
+      [insertResult.insertId]
+    );
 
-  const row = rows[0];
-  // Garantir que is_admin seja boolean (MySQL pode retornar 0/1)
-  return {
-    ...row,
-    is_admin: Boolean(row.is_admin === 1 || row.is_admin === true)
-  } as User;
+    if (!rows || rows.length === 0) {
+      console.error("❌ [CREATE_USER] Usuário não encontrado após inserção!");
+      throw new Error("Usuário não encontrado após criação");
+    }
+
+    const row = rows[0];
+    console.log("✅ [CREATE_USER] Usuário criado com sucesso:", {
+      id: row.id,
+      username: row.username,
+      created_at: row.created_at
+    });
+    
+    // Garantir que is_admin seja boolean (MySQL pode retornar 0/1)
+    return {
+      ...row,
+      is_admin: Boolean(row.is_admin === 1 || row.is_admin === true)
+    } as User;
+  } catch (error: any) {
+    console.error("❌ [CREATE_USER] Erro ao criar usuário:", {
+      error: error.message,
+      code: error.code,
+      sqlState: error.sqlState,
+      sqlMessage: error.sqlMessage
+    });
+    throw error;
+  }
 }
 
 export async function findUserByUsername(username: string): Promise<UserWithPassword | null> {
