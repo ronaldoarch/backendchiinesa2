@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { GameCard } from "../components/GameCard";
 import { api } from "../services/api";
 
@@ -94,6 +94,7 @@ export function HomePage() {
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<FilterType>("popular");
   const [favorites, setFavorites] = useState<Set<number>>(new Set());
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
 
   // Carregar favoritos do localStorage
   useEffect(() => {
@@ -223,52 +224,148 @@ export function HomePage() {
 
   const activeBanners = banners.filter((b) => b.active).sort((a, b) => a.position - b.position);
 
+  // Auto-play do carrossel
+  useEffect(() => {
+    if (activeBanners.length <= 1) return;
+
+    const interval = setInterval(() => {
+      setCurrentBannerIndex((prev) => (prev + 1) % activeBanners.length);
+    }, 5000); // Muda a cada 5 segundos
+
+    return () => clearInterval(interval);
+  }, [activeBanners.length]);
+
+  // Resetar índice quando banners mudarem
+  useEffect(() => {
+    setCurrentBannerIndex(0);
+  }, [activeBanners.length]);
+
+  const goToNext = () => {
+    setCurrentBannerIndex((prev) => (prev + 1) % activeBanners.length);
+  };
+
+  const goToPrevious = () => {
+    setCurrentBannerIndex((prev) => (prev - 1 + activeBanners.length) % activeBanners.length);
+  };
+
+  const goToSlide = (index: number) => {
+    setCurrentBannerIndex(index);
+  };
+
+  // Touch/swipe support
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    if (isLeftSwipe) goToNext();
+    if (isRightSwipe) goToPrevious();
+  };
+
   return (
     <div className="home-layout">
       {activeBanners.length > 0 ? (
-        activeBanners.map((banner) => {
-          const imageUrl = getImageUrl(banner.imageUrl || "");
-          
-          return (
-            <section
-              key={banner.id}
-              className="banner"
-              style={{
-                cursor: banner.linkUrl ? "pointer" : "default"
-              }}
-              onClick={() => {
-                if (banner.linkUrl) {
-                  if (banner.linkUrl.startsWith("http")) {
-                    window.open(banner.linkUrl, "_blank");
-                  } else {
-                    window.location.href = banner.linkUrl;
-                  }
-                }
-              }}
-            >
-            {banner.imageUrl ? (
-              <BannerImage
-                imageUrl={imageUrl}
-                title={banner.title}
-                bannerId={banner.id}
-              />
-            ) : (
-              <div className="banner-content">
-                <span className="badge-gold">Promoção</span>
-                <h1>{banner.title || "Banner promocional"}</h1>
-              </div>
-            )}
-            </section>
-          );
-        })
-      ) : (
-      <section className="banner">
-        <div className="banner-content">
-          <span className="badge-gold">Bônus de boas-vindas</span>
-          <h1>Recarregue e ganhe até R$ 7.777</h1>
-          <p>Promoções exclusivas e jackpots progressivos.</p>
+        <div className="banner-carousel">
+          <div
+            className="banner-carousel-container"
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+          >
+            {activeBanners.map((banner, index) => {
+              const imageUrl = getImageUrl(banner.imageUrl || "");
+              const isActive = index === currentBannerIndex;
+              
+              return (
+                <section
+                  key={banner.id}
+                  className={`banner-carousel-slide ${isActive ? "active" : ""}`}
+                  style={{
+                    cursor: banner.linkUrl ? "pointer" : "default"
+                  }}
+                  onClick={() => {
+                    if (banner.linkUrl) {
+                      if (banner.linkUrl.startsWith("http")) {
+                        window.open(banner.linkUrl, "_blank");
+                      } else {
+                        window.location.href = banner.linkUrl;
+                      }
+                    }
+                  }}
+                >
+                  {banner.imageUrl ? (
+                    <BannerImage
+                      imageUrl={imageUrl}
+                      title={banner.title}
+                      bannerId={banner.id}
+                    />
+                  ) : (
+                    <div className="banner-content">
+                      <span className="badge-gold">Promoção</span>
+                      <h1>{banner.title || "Banner promocional"}</h1>
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+
+          {/* Navegação com setas */}
+          {activeBanners.length > 1 && (
+            <>
+              <button
+                className="banner-carousel-arrow banner-carousel-arrow-left"
+                onClick={goToPrevious}
+                aria-label="Banner anterior"
+              >
+                ‹
+              </button>
+              <button
+                className="banner-carousel-arrow banner-carousel-arrow-right"
+                onClick={goToNext}
+                aria-label="Próximo banner"
+              >
+                ›
+              </button>
+            </>
+          )}
+
+          {/* Indicadores (dots) */}
+          {activeBanners.length > 1 && (
+            <div className="banner-carousel-dots">
+              {activeBanners.map((_, index) => (
+                <button
+                  key={index}
+                  className={`banner-carousel-dot ${index === currentBannerIndex ? "active" : ""}`}
+                  onClick={() => goToSlide(index)}
+                  aria-label={`Ir para banner ${index + 1}`}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      </section>
+      ) : (
+        <section className="banner">
+          <div className="banner-content">
+            <span className="badge-gold">Bônus de boas-vindas</span>
+            <h1>Recarregue e ganhe até R$ 7.777</h1>
+            <p>Promoções exclusivas e jackpots progressivos.</p>
+          </div>
+        </section>
       )}
 
       <section className="tabs-row">
