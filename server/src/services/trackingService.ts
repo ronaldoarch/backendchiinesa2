@@ -1,4 +1,6 @@
 import axios from "axios";
+import { pool } from "../config/database";
+import { RowDataPacket } from "mysql2";
 
 export type TrackingEvent = {
   event: string;
@@ -22,8 +24,6 @@ export type WebhookConfig = {
  */
 async function getWebhookConfigs(): Promise<WebhookConfig[]> {
   try {
-    const { pool } = await import("../config/database");
-    const { RowDataPacket } = await import("mysql2");
 
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT \`key\`, \`value\` FROM settings WHERE \`key\` LIKE 'webhook.%'`
