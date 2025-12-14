@@ -634,16 +634,56 @@ body {
 
 .admin-dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin-top: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
 }
 
 .admin-card {
-  background: #111119;
+  background: var(--bg-elevated);
   border-radius: 12px;
-  padding: 10px 12px;
-  border: 1px solid rgba(246, 196, 83, 0.28);
+  padding: 20px;
+  border: 1px solid rgba(246, 196, 83, 0.2);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.admin-card:hover {
+  border-color: rgba(246, 196, 83, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(246, 196, 83, 0.1);
+}
+
+.admin-card-primary {
+  border-color: rgba(52, 199, 89, 0.3);
+  background: linear-gradient(135deg, rgba(52, 199, 89, 0.05), var(--bg-elevated));
+}
+
+.admin-card-success {
+  border-color: rgba(0, 122, 255, 0.3);
+  background: linear-gradient(135deg, rgba(0, 122, 255, 0.05), var(--bg-elevated));
+}
+
+.admin-card-info {
+  border-color: rgba(255, 149, 0, 0.3);
+  background: linear-gradient(135deg, rgba(255, 149, 0, 0.05), var(--bg-elevated));
+}
+
+.admin-card-warning {
+  border-color: rgba(255, 59, 48, 0.3);
+  background: linear-gradient(135deg, rgba(255, 59, 48, 0.05), var(--bg-elevated));
+}
+
+.admin-card-icon {
+  font-size: 32px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.admin-card-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .admin-card-label {
