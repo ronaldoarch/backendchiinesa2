@@ -159,43 +159,50 @@ export function DepositPage() {
               <div>
                 <p>Escaneie o QR Code abaixo para pagar:</p>
                 {transaction.qrCodeBase64 ? (
-                  // Verificar se é uma URL ou base64
-                  transaction.qrCodeBase64.startsWith("http") ? (
-                    <img
-                      src={transaction.qrCodeBase64}
-                      alt="QR Code PIX"
-                      style={{
-                        maxWidth: "100%",
-                        height: "auto",
-                        margin: "16px 0",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        borderRadius: "8px"
-                      }}
-                      onError={(e) => {
-                        console.error("Erro ao carregar imagem QR Code:", e);
-                        // Se a imagem falhar, mostrar o código copia e cola
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = "none";
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src={`data:image/png;base64,${transaction.qrCodeBase64}`}
-                      alt="QR Code PIX"
-                      style={{
-                        maxWidth: "100%",
-                        height: "auto",
-                        margin: "16px 0",
-                        border: "1px solid rgba(255,255,255,0.1)",
-                        borderRadius: "8px"
-                      }}
-                      onError={(e) => {
-                        console.error("Erro ao carregar QR Code base64:", e);
-                        const target = e.target as HTMLImageElement;
-                        target.style.display = "none";
-                      }}
-                    />
-                  )
+                  (() => {
+                    // Determinar o src correto: pode ser URL, base64 com prefixo, ou base64 sem prefixo
+                    let imageSrc = transaction.qrCodeBase64;
+                    
+                    if (imageSrc.startsWith("http://") || imageSrc.startsWith("https://")) {
+                      // É uma URL
+                      imageSrc = imageSrc;
+                    } else if (imageSrc.startsWith("data:image")) {
+                      // Já tem o prefixo data:image
+                      imageSrc = imageSrc;
+                    } else {
+                      // É base64 puro, adicionar prefixo
+                      imageSrc = `data:image/png;base64,${imageSrc}`;
+                    }
+                    
+                    console.log("🖼️ Image src formatado:", imageSrc.substring(0, 100) + "...");
+                    
+                    return (
+                      <img
+                        src={imageSrc}
+                        alt="QR Code PIX"
+                        style={{
+                          maxWidth: "100%",
+                          height: "auto",
+                          margin: "16px 0",
+                          border: "1px solid rgba(255,255,255,0.1)",
+                          borderRadius: "8px",
+                          background: "#fff",
+                          padding: "8px"
+                        }}
+                        onError={(e) => {
+                          console.error("❌ Erro ao carregar QR Code:", {
+                            src: imageSrc.substring(0, 100),
+                            error: e
+                          });
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = "none";
+                        }}
+                        onLoad={() => {
+                          console.log("✅ QR Code carregado com sucesso!");
+                        }}
+                      />
+                    );
+                  })()
                 ) : transaction.qrCode ? (
                   <div style={{
                     padding: "16px",
