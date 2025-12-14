@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import { suitpayService, SuitPayPixRequest, SuitPayCardRequest, SuitPayBoletoRequest } from "../services/suitpayService";
 import { xbankaccessService, XBankAccessPixInRequest, XBankAccessPixOutRequest } from "../services/xbankaccessService";
 import { createTransaction, updateTransactionStatus, updateUserBalance, findTransactionByRequestNumber, listUserTransactions } from "../services/transactionsService";
+import { trackEvent, TrackingEvents } from "../services/trackingService";
 import { pool } from "../config/database";
 
 const pixRequestSchema = z.object({
@@ -199,6 +200,19 @@ export async function createPixPaymentController(req: Request, res: Response): P
         success: true,
         transaction: transactionResponse
       });
+
+      // Tracking: Depósito criado
+      trackEvent({
+        event: TrackingEvents.DEPOSIT_CREATED,
+        userId,
+        value: amount,
+        currency: "BRL",
+        metadata: {
+          requestNumber,
+          transactionId: result.data.idTransaction,
+          gateway: "xbankaccess"
+        }
+      }).catch((err) => console.error("Erro ao enviar tracking:", err));
     } else {
       // SuitPay
       await updateTransactionStatus(
@@ -796,9 +810,48 @@ export async function xbankaccessWebhookController(req: Request, res: Response):
         // Depósito - adicionar saldo
         await updateUserBalance(transaction.user_id, Math.abs(transaction.amount));
         console.log(`✅ Saldo atualizado (depósito) para usuário ${transaction.user_id}: +${Math.abs(transaction.amount)}`);
+        
+        // Tracking: Depósito pago
+        trackEvent({
+          event: TrackingEvents.DEPOSIT_PAID,
+          userId: transaction.user_id,
+          value: Math.abs(transaction.amount),
+          currency: "BRL",
+          metadata: {
+            transactionId: idTransaction,
+            requestNumber: transaction.request_number
+          }
+        }).catch((err) => console.error("Erro ao enviar tracking:", err));
       } else if (typeTransaction === "PAYMENT") {
         // Saque - já foi debitado, apenas confirmar
         console.log(`✅ Saque confirmado para usuário ${transaction.user_id}: ${Math.abs(transaction.amount)}`);
+        
+        // Tracking: Saque pago
+        trackEvent({
+          event: TrackingEvents.WITHDRAWAL_PAID,
+          userId: transaction.user_id,
+          value: Math.abs(transaction.amount),
+          currency: "BRL",
+          metadata: {
+            transactionId: idTransaction,
+            requestNumber: transaction.request_number
+          }
+        }).catch((err) => console.error("Erro ao enviar tracking:", err));
+      }
+    } else if (status === "failed" || status === "canceled") {
+      // Tracking: Depósito falhou
+      if (typeTransaction === "PIX") {
+        trackEvent({
+          event: TrackingEvents.DEPOSIT_FAILED,
+          userId: transaction.user_id,
+          value: Math.abs(transaction.amount),
+          currency: "BRL",
+          metadata: {
+            transactionId: idTransaction,
+            requestNumber: transaction.request_number,
+            status
+          }
+        }).catch((err) => console.error("Erro ao enviar tracking:", err));
       }
     }
 

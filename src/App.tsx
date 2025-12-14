@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { FacebookPixel } from "./components/FacebookPixel";
 import { Routes, Route, NavLink, useLocation } from "react-router-dom";
 import { HomePage } from "./pages/HomePage";
 import { AdminPage } from "./pages/AdminPage";
@@ -15,6 +16,7 @@ import { HomeIcon, GiftIcon, CreditCardIcon, HeadphonesIcon, UserIcon } from "./
 import { DynamicFavicon } from "./components/DynamicFavicon";
 import { DynamicLogo } from "./components/DynamicLogo";
 import { LoadingBanner } from "./components/LoadingBanner";
+import { FacebookPixel } from "./components/FacebookPixel";
 
 export function App() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -173,9 +175,26 @@ export function App() {
     return () => window.removeEventListener("focus", handleFocus);
   }, [user?.id]);
 
+  // Buscar Facebook Pixel ID das configurações
+  const [facebookPixelId, setFacebookPixelId] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get<Record<string, string>>("/settings")
+      .then((response) => {
+        const pixelId = response.data["tracking.facebookPixelId"];
+        if (pixelId) {
+          setFacebookPixelId(pixelId);
+        }
+      })
+      .catch(() => {
+        // Silenciosamente falhar se não conseguir carregar
+      });
+  }, []);
+
   return (
     <div className={`app-root${isAdmin ? " app-root-admin" : ""}`}>
       <DynamicFavicon />
+      {facebookPixelId && <FacebookPixel pixelId={facebookPixelId} />}
       <header className="top-bar">
         <div className="top-bar-left">
           <button

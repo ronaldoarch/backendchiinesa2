@@ -8,6 +8,7 @@ import { playfiversRouter } from "./playfivers";
 import { authRouter } from "./auth";
 import { promotionsRouter } from "./promotions";
 import { paymentsRouter } from "./payments";
+import { statsRouter } from "./stats";
 import { authenticate, requireAdmin } from "../middleware/auth";
 
 export const apiRouter = Router();
@@ -131,6 +132,7 @@ apiRouter.use("/payments", paymentsRouter);
 // Protegidas
 apiRouter.use("/uploads", authenticate, requireAdmin, uploadsRouter);
 apiRouter.use("/playfivers", authenticate, requireAdmin, playfiversRouter);
+apiRouter.use("/stats", statsRouter);
 
 
 

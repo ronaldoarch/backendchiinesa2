@@ -9,6 +9,7 @@ import {
   updateUserProfile,
   updateUserPassword
 } from "../services/authService";
+import { trackEvent, TrackingEvents } from "../services/trackingService";
 
 const registerSchema = z.object({
   username: z.string().min(3).max(50),
@@ -70,6 +71,15 @@ export async function registerController(req: Request, res: Response): Promise<v
       token
     });
     console.log("✅ [REGISTER] Resposta enviada com sucesso");
+
+    // Tracking: Usuário registrado
+    trackEvent({
+      event: TrackingEvents.USER_REGISTERED,
+      userId: user.id,
+      username: user.username,
+      phone: user.phone,
+      currency: user.currency
+    }).catch((err) => console.error("Erro ao enviar tracking:", err));
   } catch (error: any) {
     // eslint-disable-next-line no-console
     console.error("❌ [REGISTER] Erro ao criar usuário:", {
@@ -164,6 +174,13 @@ export async function loginController(req: Request, res: Response): Promise<void
       token_generated: !!token
     });
     res.json(responseData);
+
+    // Tracking: Usuário fez login
+    trackEvent({
+      event: TrackingEvents.USER_LOGIN,
+      userId: user.id,
+      username: user.username
+    }).catch((err) => console.error("Erro ao enviar tracking:", err));
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error("Login: Erro inesperado", error);
