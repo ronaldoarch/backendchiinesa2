@@ -524,10 +524,17 @@ body {
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   z-index: 15;
+  transition: opacity 0.3s ease;
 }
 
-.admin-menu.open ~ .admin-menu-overlay {
+.admin-shell:has(.admin-menu.open) .admin-menu-overlay {
   display: block;
+}
+
+@media (min-width: 768px) {
+  .admin-menu-overlay {
+    display: none !important;
+  }
 }
 
 @media (min-width: 768px) {

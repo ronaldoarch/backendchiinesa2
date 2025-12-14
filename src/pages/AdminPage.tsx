@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, Route, Routes, Navigate } from "react-router-dom";
 import { AdminDashboardPage } from "./admin/AdminDashboardPage";
 import { AdminBrandingPage } from "./admin/AdminBrandingPage";
@@ -12,22 +12,38 @@ import { AdminSuitPayPage } from "./admin/AdminSuitPayPage";
 export function AdminPage() {
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Fechar menu ao clicar fora (mobile)
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as HTMLElement;
+      if (menuOpen && !target.closest(".admin-menu") && !target.closest(".admin-menu-toggle")) {
+        setMenuOpen(false);
+      }
+    }
+
+    if (menuOpen) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [menuOpen]);
+
   return (
     <div className="admin-shell">
-      <button
-        type="button"
-        className="admin-menu-toggle"
-        onClick={() => setMenuOpen((v) => !v)}
-      >
-        ☰
-      </button>
-
       {menuOpen && (
         <div 
           className="admin-menu-overlay"
           onClick={() => setMenuOpen(false)}
         />
       )}
+      <button
+        type="button"
+        className="admin-menu-toggle"
+        onClick={() => setMenuOpen((v) => !v)}
+        aria-label="Toggle menu"
+      >
+        ☰
+      </button>
+
       <aside className={`admin-menu ${menuOpen ? "open" : ""}`}>
         <h2 className="admin-menu-title">Painel Admin</h2>
         <nav className="admin-menu-list">
