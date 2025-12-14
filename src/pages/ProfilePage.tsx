@@ -319,15 +319,50 @@ function EditDataModal({ userData, onClose, onSuccess }: EditDataModalProps) {
         }
       }
 
-      await api.put("/auth/profile", updateData);
+      console.log("📤 Enviando dados para atualização:", updateData);
+      console.log("🔗 URL da API:", api.defaults.baseURL);
+      console.log("🔗 Endpoint completo:", `${api.defaults.baseURL}/auth/profile`);
+      
+      const response = await api.put("/auth/profile", updateData);
+      console.log("✅ Dados atualizados com sucesso:", response.data);
       setSuccess(true);
       setTimeout(() => {
         onSuccess();
         onClose();
       }, 1500);
     } catch (err: any) {
-      console.error("Erro ao atualizar dados:", err);
-      setError(err.response?.data?.error || "Erro ao atualizar dados");
+      console.error("❌ Erro ao atualizar dados:", {
+        error: err,
+        response: err.response,
+        status: err.response?.status,
+        data: err.response?.data,
+        url: err.config?.url,
+        baseURL: err.config?.baseURL,
+        fullURL: err.config?.baseURL ? `${err.config.baseURL}${err.config.url}` : "N/A"
+      });
+      
+      let errorMessage = "Erro ao atualizar dados";
+      
+      if (err.response) {
+        // Erro com resposta do servidor
+        if (err.response.status === 404) {
+          errorMessage = "Rota não encontrada. O backend precisa ser atualizado no Coolify.";
+        } else if (err.response.status === 401) {
+          errorMessage = "Sessão expirada. Faça login novamente.";
+        } else if (err.response.status === 400) {
+          errorMessage = err.response.data?.error || err.response.data?.message || "Dados inválidos";
+        } else {
+          errorMessage = err.response.data?.error || err.response.data?.message || `Erro ${err.response.status}`;
+        }
+      } else if (err.request) {
+        // Erro de rede
+        errorMessage = "Erro de conexão. Verifique sua internet.";
+      } else {
+        // Outro erro
+        errorMessage = err.message || "Erro desconhecido";
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
