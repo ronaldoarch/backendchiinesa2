@@ -18,7 +18,7 @@ import { LoadingBanner } from "./components/LoadingBanner";
 
 export function App() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [user, setUser] = useState<{ username: string; id: number; is_admin: boolean } | null>(null);
+  const [user, setUser] = useState<{ username: string; id: number; is_admin: boolean; balance?: number } | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "register">("register");
   const [loading, setLoading] = useState(true);
@@ -107,12 +107,71 @@ export function App() {
       const savedUser = getUser();
       const token = localStorage.getItem("token");
       if (token && savedUser) {
-        setUser(savedUser);
+        // Atualizar dados do usuário incluindo saldo
+        api.get("/auth/me")
+          .then((response) => {
+            const updatedUser = {
+              ...response.data,
+              is_admin: Boolean(
+                response.data.is_admin === true || 
+                response.data.is_admin === 1 || 
+                response.data.is_admin === "true" ||
+                response.data.is_admin === "1"
+              )
+            };
+            setUser(updatedUser);
+            saveUserToStorage(updatedUser);
+          })
+          .catch(() => {
+            setUser(savedUser);
+          });
       } else {
         setUser(null);
       }
     }
   }, [authOpen]);
+
+  // Atualizar saldo periodicamente quando usuário estiver logado
+  useEffect(() => {
+    if (!user || !user.id) return;
+
+    // Atualizar saldo a cada 30 segundos
+    const interval = setInterval(() => {
+      api.get("/auth/me")
+        .then((response) => {
+          if (response.data.balance !== undefined) {
+            setUser((prev) => prev ? { ...prev, balance: response.data.balance } : null);
+            saveUserToStorage({ ...user, balance: response.data.balance });
+          }
+        })
+        .catch(() => {
+          // Silenciosamente falhar se não conseguir atualizar
+        });
+    }, 30000); // 30 segundos
+
+    return () => clearInterval(interval);
+  }, [user?.id]);
+
+  // Atualizar saldo quando a página ganha foco (volta da aba)
+  useEffect(() => {
+    if (!user || !user.id) return;
+
+    const handleFocus = () => {
+      api.get("/auth/me")
+        .then((response) => {
+          if (response.data.balance !== undefined) {
+            setUser((prev) => prev ? { ...prev, balance: response.data.balance } : null);
+            saveUserToStorage({ ...user, balance: response.data.balance });
+          }
+        })
+        .catch(() => {
+          // Silenciosamente falhar se não conseguir atualizar
+        });
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [user?.id]);
 
   return (
     <div className={`app-root${isAdmin ? " app-root-admin" : ""}`}>
@@ -135,7 +194,17 @@ export function App() {
         <div className="top-bar-right">
           {user && user.username ? (
             <>
-              <span className="user-pill">Olá, {user.username}</span>
+              <span className="user-pill">
+                Olá, {user.username}
+                {user.balance !== undefined && (
+                  <span className="user-balance">
+                    {" "}• R$ {new Intl.NumberFormat("pt-BR", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    }).format(user.balance || 0)}
+                  </span>
+                )}
+              </span>
               {(user.is_admin === true || user.is_admin === "true" || user.is_admin === 1 || user.is_admin === "1") && (
                 <NavLink 
                   to="/admin" 

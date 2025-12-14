@@ -83,7 +83,7 @@ export async function findUserByUsername(username: string): Promise<UserWithPass
     console.log("🔍 [FIND_USER] Banco de dados atual:", dbInfo[0]?.db);
     
     const [rows] = await pool.query<RowDataPacket[]>(
-      "SELECT id, username, password_hash, phone, currency, is_admin, created_at FROM users WHERE username = ?",
+      "SELECT id, username, password_hash, phone, email, document, currency, COALESCE(balance, 0) as balance, is_admin, created_at FROM users WHERE username = ?",
       [username]
     );
 
@@ -102,12 +102,14 @@ export async function findUserByUsername(username: string): Promise<UserWithPass
     console.log("⚠️ [FIND_USER] Usuário encontrado:", {
       id: row.id,
       username: row.username,
+      balance: row.balance,
       created_at: row.created_at
     });
     
     // Garantir que is_admin seja boolean (MySQL pode retornar 0/1)
     return {
       ...row,
+      balance: Number(row.balance || 0),
       is_admin: Boolean(row.is_admin === 1 || row.is_admin === true)
     } as UserWithPassword;
   } catch (error: any) {

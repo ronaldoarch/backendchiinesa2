@@ -53,12 +53,18 @@ export async function registerController(req: Request, res: Response): Promise<v
     const token = generateToken(user);
     console.log("🔑 [REGISTER] Token gerado");
 
+    // Buscar dados completos do usuário incluindo balance
+    const fullUser = await findUserById(user.id);
+
     res.status(201).json({
       user: {
         id: user.id,
         username: user.username,
         phone: user.phone,
+        email: fullUser?.email,
+        document: fullUser?.document,
         currency: user.currency,
+        balance: fullUser?.balance || 0,
         is_admin: user.is_admin
       },
       token
@@ -133,12 +139,18 @@ export async function loginController(req: Request, res: Response): Promise<void
 
     const token = generateToken(user);
 
+    // Buscar dados completos do usuário incluindo balance
+    const fullUser = await findUserById(user.id);
+    
     const responseData = {
       user: {
         id: user.id,
         username: user.username,
         phone: user.phone,
+        email: fullUser?.email,
+        document: fullUser?.document,
         currency: user.currency,
+        balance: fullUser?.balance || 0,
         is_admin: user.is_admin
       },
       token
