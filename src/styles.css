@@ -852,6 +852,28 @@ body {
   }
 
   .admin-form h3,
+  .admin-form-button {
+    padding: 8px 16px;
+    background: var(--gold);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .admin-form-button:hover:not(:disabled) {
+    background: #d4a854;
+    transform: translateY(-1px);
+  }
+
+  .admin-form-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   .admin-form button {
     grid-column: span 2;
   }

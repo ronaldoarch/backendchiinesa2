@@ -16,7 +16,7 @@ import { HomeIcon, GiftIcon, CreditCardIcon, HeadphonesIcon, UserIcon } from "./
 import { DynamicFavicon } from "./components/DynamicFavicon";
 import { DynamicLogo } from "./components/DynamicLogo";
 import { LoadingBanner } from "./components/LoadingBanner";
-import { FacebookPixel } from "./components/FacebookPixel";
+import { UtmfyTracker } from "./components/UtmfyTracker";
 
 export function App() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -195,6 +195,7 @@ export function App() {
     <div className={`app-root${isAdmin ? " app-root-admin" : ""}`}>
       <DynamicFavicon />
       {facebookPixelId && <FacebookPixel pixelId={facebookPixelId} />}
+      <UtmfyTracker />
       <header className="top-bar">
         <div className="top-bar-left">
           <button
